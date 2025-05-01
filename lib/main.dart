@@ -1,14 +1,23 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:firebase_messaging/firebase_messaging.dart'; // Import for FCM
 import 'firebase_options.dart'; // Ensure this import is present
-import 'home_page.dart'; // This should be the file containing the HomePage or ChatbotPage widget
+import 'home_page.dart'; // Ensure this points to the HomePage or ChatbotPage widget
 import 'maintenance_log_page.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
+import 'notification_service.dart'; // Import the new notification service
+
+import 'package:meta/meta.dart'; // Import meta package for pragma annotation
+
+// Background message handler function; must be a top-level function
+@pragma('vm:entry-point') // This annotation is necessary for background handlers
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print('Handling a background message: ${message.messageId}');
+  // You can also process the message further if needed
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,9 +29,15 @@ Future<void> main() async {
     );
   } catch (e) {
     print("Error initializing Firebase: $e");
-    // Optionally handle error (e.g., navigate to an error page, show a message)
     return; // Prevent running the app if initialization fails
   }
+
+  // Register the background message handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Initialize FCM and get the token
+  NotificationService notificationService = NotificationService();
+  await notificationService.setupFCM();
 
   runApp(MyApp());
 }
@@ -45,6 +60,7 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
 
 class AuthGate extends StatelessWidget {
   @override
@@ -74,7 +90,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _pages = [
     MaintenanceLogPage(),
-    ChatbotPage(), // Changed from ChatbotPage to HomePage
+    ChatbotPage(), // Assuming this is your Chatbot/Home
     ProfilePage(),
   ];
 
