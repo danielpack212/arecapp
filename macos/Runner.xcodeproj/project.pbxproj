@@ -29,8 +29,6 @@
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
 		75A628A8C6960FD82BBAFE4A /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6704665587C62B41B64E649F /* Pods_RunnerTests.framework */; };
-		BBA1EB832DCB258000C8A54D /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = BBA1EB822DCB258000C8A54D /* GoogleService-Info.plist */; };
-		BBA1EB842DCB258000C8A54D /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = BBA1EB822DCB258000C8A54D /* GoogleService-Info.plist */; };
 		BBA1EB872DCB261D00C8A54D /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = BBA1EB862DCB261D00C8A54D /* FirebaseAnalytics */; };
 		BBA1EB892DCB261D00C8A54D /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = BBA1EB882DCB261D00C8A54D /* FirebaseAnalyticsOnDeviceConversion */; };
 		BBA1EB8B2DCB261D00C8A54D /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = BBA1EB8A2DCB261D00C8A54D /* FirebaseAppCheck */; };
@@ -54,6 +52,7 @@
 		BBA1EBAF2DCB261D00C8A54D /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = BBA1EBAE2DCB261D00C8A54D /* FirebaseStorage */; };
 		BBA1EBB12DCB261D00C8A54D /* FirebaseStorageCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = BBA1EBB02DCB261D00C8A54D /* FirebaseStorageCombine-Community */; };
 		BBA1EBB32DCB261D00C8A54D /* FirebaseVertexAI in Frameworks */ = {isa = PBXBuildFile; productRef = BBA1EBB22DCB261D00C8A54D /* FirebaseVertexAI */; };
+		BBA1EBBE2DCB32A300C8A54D /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = BBA1EBBD2DCB32A300C8A54D /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -112,7 +111,7 @@
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A9D9DE845AF2F434F49DE8DB /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		B6DC6828701670CD5BD9C270 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		BBA1EB822DCB258000C8A54D /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		BBA1EBBD2DCB32A300C8A54D /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "../../../../Downloads/GoogleService-Info.plist"; sourceTree = "<group>"; };
 		CB1A9D585E3D4A944D3333D6 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -194,13 +193,13 @@
 		33CC10E42044A3C60003C045 = {
 			isa = PBXGroup;
 			children = (
+				BBA1EBBD2DCB32A300C8A54D /* GoogleService-Info.plist */,
 				33FAB671232836740065AC1E /* Runner */,
 				33CEB47122A05771004F2AC0 /* Flutter */,
 				331C80D6294CF71000263BE5 /* RunnerTests */,
 				33CC10EE2044A3C60003C045 /* Products */,
 				D73912EC22F37F3D000D13A0 /* Frameworks */,
 				2E8380C22B5AE36C5A54CD7E /* Pods */,
-				BBA1EB822DCB258000C8A54D /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -360,7 +359,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BBA1EB832DCB258000C8A54D /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -368,9 +366,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BBA1EBBE2DCB32A300C8A54D /* GoogleService-Info.plist in Resources */,
 				33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */,
 				33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */,
-				BBA1EB842DCB258000C8A54D /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -445,13 +443,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -536,6 +530,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.restructure.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -551,6 +546,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.restructure.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -566,6 +562,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.restructure.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -637,6 +634,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = "";
 				SWIFT_VERSION = 5.0;
@@ -647,6 +645,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Manual;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Profile;
@@ -770,6 +769,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = "";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -791,6 +791,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = "";
 				SWIFT_VERSION = 5.0;
@@ -801,6 +802,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Manual;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -809,6 +811,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

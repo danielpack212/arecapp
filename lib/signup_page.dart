@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'main.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'main.dart'; // Import the file where MainNavigation is defined
 
 class SignUpPage extends StatefulWidget {
   @override
@@ -10,21 +11,35 @@ class SignUpPage extends StatefulWidget {
 class _SignUpPageState extends State<SignUpPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _roleController = TextEditingController();
   bool _obscurePassword = true;
   String error = '';
 
   Future<void> _signup() async {
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // Store additional user information in Firestore
+      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+        'name': _nameController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'role': _roleController.text.trim(),
+        'email': _emailController.text.trim(),
+      });
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => MainNavigation()),
       );
     } catch (e) {
-      setState(() => error = 'Signup failed. Please try again.');
+      setState(() {
+        error = 'Signup failed. Please try again. Error: $e';
+      });
     }
   }
 
@@ -44,6 +59,21 @@ class _SignUpPageState extends State<SignUpPage> {
             if (error.isNotEmpty)
               Text(error, style: TextStyle(color: Colors.red)),
             SizedBox(height: 20),
+            TextField(
+              controller: _nameController,
+              decoration: _inputDecoration('Name'),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: _phoneController,
+              decoration: _inputDecoration('Phone Number'),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: _roleController,
+              decoration: _inputDecoration('Role'),
+            ),
+            SizedBox(height: 16),
             TextField(
               controller: _emailController,
               decoration: _inputDecoration('Email'),
