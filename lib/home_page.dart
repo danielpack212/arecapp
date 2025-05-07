@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class ChatbotPage extends StatefulWidget {
   @override
@@ -23,6 +24,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.8, // Constrain width for messages
+        ),
         margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
         decoration: BoxDecoration(
@@ -40,6 +44,11 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   @override
   Widget build(BuildContext context) {
+    double textFieldWidth = kIsWeb ? 600 : double.infinity;
+    if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux || defaultTargetPlatform == TargetPlatform.windows)) {
+      textFieldWidth = 600;
+    }
+
     return Column(
       children: [
         Expanded(
@@ -55,8 +64,12 @@ class _ChatbotPageState extends State<ChatbotPage> {
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           color: Colors.grey[900],
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
+              Container(
+                width: textFieldWidth == double.infinity
+                    ? MediaQuery.of(context).size.width - 80 // Account for padding and button width
+                    : textFieldWidth,
                 child: TextField(
                   controller: _controller,
                   onSubmitted: (value) => _sendMessage(value),

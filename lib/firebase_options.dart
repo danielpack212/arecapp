@@ -1,11 +1,11 @@
-// firebase_options.dart
-
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform, kIsWeb;
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    if (defaultTargetPlatform == TargetPlatform.android) {
+    if (kIsWeb) {
+      return _web;
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
       return _android;
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       return _ios;
@@ -13,6 +13,16 @@ class DefaultFirebaseOptions {
       throw UnsupportedError('Platform not supported: $defaultTargetPlatform');
     }
   }
+
+  static const FirebaseOptions _web = FirebaseOptions(
+    apiKey: "AIzaSyAJRQmQUKjMZJvhVVTAKExFyI8dVzoxOSE",
+    authDomain: "arec-app.firebaseapp.com",
+    projectId: "arec-app",
+    storageBucket: "arec-app.appspot.com", // Corrected storage bucket
+    messagingSenderId: "449090184290",
+    appId: "1:449090184290:web:43a6da94e5d1881c15dd3b",
+    measurementId: "G-31Q830NBQQ",
+  );
 
   static const FirebaseOptions _android = FirebaseOptions(
     apiKey: 'AIzaSyAJRQmQUKjMZJvhVVTAKExFyI8dVzoxOSE', // Your Android API Key

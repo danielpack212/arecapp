@@ -1,10 +1,9 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import 'firebase_options.dart'; // Ensure this import is present
-import 'home_page.dart'; // This should be the file containing the HomePage or ChatbotPage widget
+import 'home_page.dart'; // Ensure that this import is correct
 import 'maintenance_log_page.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
@@ -13,15 +12,14 @@ import 'signup_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
+  // Initialize Firebase for all supported platforms
   try {
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform, // Use the platform-specific options
+      options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e) {
     print("Error initializing Firebase: $e");
     // Optionally handle error (e.g., navigate to an error page, show a message)
-    return; // Prevent running the app if initialization fails
   }
 
   runApp(MyApp());
@@ -101,7 +99,7 @@ class _MainNavigationState extends State<MainNavigation> {
         onTap: _onItemTapped, // Handle item taps
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.build), label: 'Maintenance'),
-          BottomNavigationBarItem(icon: Icon(Icons.lightbulb), label: 'Chat'), // Assuming this is your Chatbot/Home
+          BottomNavigationBarItem(icon: Icon(Icons.lightbulb), label: 'Chat'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
         selectedFontSize: 12,

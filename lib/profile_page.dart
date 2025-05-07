@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class ProfilePage extends StatelessWidget {
   final user = FirebaseAuth.instance.currentUser;
@@ -33,7 +34,7 @@ class ProfilePage extends StatelessWidget {
               ),
               onPressed: () async {
                 await FirebaseAuth.instance.signOut();
-                Navigator.of(context).pushReplacementNamed('/');
+                Navigator.of(context).pushReplacementNamed('/login');
               },
             ),
           ],
