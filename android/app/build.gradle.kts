@@ -12,6 +12,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -39,6 +40,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:30.3.1")) // Use the latest version available for Firebase BoM
     implementation("com.google.firebase:firebase-messaging-ktx") // For Firebase Messaging
     implementation("com.google.firebase:firebase-analytics-ktx") // Optional, for Firebase Analytics
+    coreLibraryDesugaring ("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
 // Flutter source mapping, it's specific to your directory structure

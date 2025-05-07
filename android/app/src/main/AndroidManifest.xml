@@ -14,7 +14,7 @@
 
             <meta-data
                 android:name="com.google.firebase.messaging.default_notification_channel_id"
-                android:value="default_channel_id" /> <!-- Make sure this matches what you create in MainActivity -->
+                android:value="high_importance_channel" /> <!-- Make sure this matches what you create in MainActivity -->
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -40,4 +40,5 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/> <!-- Add this for Android 13+ -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 </manifest>

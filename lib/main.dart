@@ -9,11 +9,16 @@ import 'profile_page.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 import 'notification_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   print('Handling a background message: ${message.messageId}');
 }
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +34,30 @@ Future<void> main() async {
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+  await _setupFlutterNotifications();
+
   runApp(MyApp());
+}
+
+Future<void> _setupFlutterNotifications() async {
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'high_importance_channel', // ID
+    'High Importance Notifications', // Name
+    importance: Importance.high,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
 }
 
 class MyApp extends StatelessWidget {
@@ -103,12 +131,28 @@ class _MainNavigationState extends State<MainNavigation> {
       }
     }
 
-    _notificationService.onMessage.listen((message) {
+    FirebaseMessaging.onMessage.listen((message) {
       if (message.notification != null) {
-        _showNotificationDialog(
-          message.notification!.title ?? 'No Title',
-          message.notification!.body ?? 'No Body',
-        );
+        final notification = message.notification!;
+        final android = message.notification?.android;
+        if (android != null) {
+          flutterLocalNotificationsPlugin.show(
+            notification.hashCode,
+            notification.title,
+            notification.body,
+            const NotificationDetails(
+              android: AndroidNotificationDetails(
+                'high_importance_channel',
+                'High Importance Notifications',
+                importance: Importance.high,
+                priority: Priority.high,
+                showWhen: true,
+              ),
+            ),
+          );
+        } else {
+          _showNotificationDialog(notification.title ?? 'No Title', notification.body ?? 'No Body');
+        }
       }
     });
   }
