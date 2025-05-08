@@ -19,7 +19,7 @@ class ProfilePage extends StatelessWidget {
     final isWeb = kIsWeb; // Use kIsWeb to check if the platform is web
 
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       appBar: isWeb
           ? null
           : AppBar(
