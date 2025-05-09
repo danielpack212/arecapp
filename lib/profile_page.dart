@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfilePage extends StatelessWidget {
   final User? user = FirebaseAuth.instance.currentUser;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _roleController = TextEditingController();
 
   Future<Map<String, dynamic>?> _fetchUserData() async {
     if (user != null) {
@@ -16,7 +19,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWeb = kIsWeb; // Use kIsWeb to check if the platform is web
+    final isWeb = kIsWeb; // Check platform
 
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 255, 255, 255),
@@ -31,7 +34,7 @@ class ProfilePage extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: SizedBox(
-            width: isWeb ? 600 : double.infinity, // Card width for web and mobile
+            width: isWeb ? 600 : double.infinity, // Condition for card width
             child: FutureBuilder<Map<String, dynamic>?>(
               future: _fetchUserData(),
               builder: (context, snapshot) {
@@ -44,6 +47,10 @@ class ProfilePage extends StatelessWidget {
                 }
 
                 final userData = snapshot.data!;
+                // Initialize text controllers with user data
+                _nameController.text = userData['name'] ?? ''; 
+                _phoneController.text = userData['phone'] ?? ''; 
+                _roleController.text = userData['role'] ?? ''; 
 
                 return Card(
                   color: Colors.grey[800],
@@ -54,7 +61,7 @@ class ProfilePage extends StatelessWidget {
                     padding: const EdgeInsets.all(24.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min, // Shrink card vertically
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,31 +83,41 @@ class ProfilePage extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   SizedBox(height: 10),
-                                  Text(
-                                    'Name: ${userData['name'] ?? 'No name'}',
-                                    style: TextStyle(fontSize: 18, color: Colors.grey[500]),
+                                  TextField(
+                                    controller: _nameController,
+                                    decoration: InputDecoration(labelText: 'Name'),
+                                    style: TextStyle(color: Colors.white),
                                   ),
                                   SizedBox(height: 10),
-                                  Text(
-                                    'Role: ${userData['role'] ?? 'No role'}',
-                                    style: TextStyle(fontSize: 18, color: Colors.grey[500]),
+                                  TextField(
+                                    controller: _phoneController,
+                                    decoration: InputDecoration(labelText: 'Phone Number'),
+                                    style: TextStyle(color: Colors.white),
                                   ),
                                   SizedBox(height: 10),
-                                  Text(
-                                    'Phone Number: ${userData['phone'] ?? 'No phone number'}',
-                                    style: TextStyle(fontSize: 18, color: Colors.grey[500]),
+                                  TextField(
+                                    controller: _roleController,
+                                    decoration: InputDecoration(labelText: 'Role'),
+                                    style: TextStyle(color: Colors.white),
                                   ),
                                   SizedBox(height: 10),
-                                  Text(
-                                    'Email Address: ${userData['email'] ?? 'No email'}',
-                                    style: TextStyle(fontSize: 18, color: Colors.grey[500]),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
                                 ],
                               ),
                             ),
                           ],
+                        ),
+                        SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () async {
+                            // Update user profile in Firestore
+                            await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({
+                              'name': _nameController.text,
+                              'phone': _phoneController.text,
+                              'role': _roleController.text,
+                            });
+                          },
+                          child: Text('Update Profile'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                         ),
                         SizedBox(height: 20),
                         Center(

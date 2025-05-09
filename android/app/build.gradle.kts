@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -13,17 +12,15 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "ARECC1.App"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -32,13 +29,23 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
+// Adding dependencies correctly in Kotlin DSL
+dependencies {
+    // Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:30.3.1")) // Use the Firebase Bill of Materials for version management
+    implementation("com.google.firebase:firebase-messaging-ktx") // Firebase Messaging
+    implementation("com.google.firebase:firebase-analytics-ktx") // Firebase Analytics, if needed
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4") // Required for certain compatibility features
+    implementation("androidx.appcompat:appcompat:1.6.1") // Ensure this is updated
+    implementation("androidx.core:core-ktx:1.10.1") // Ensure this is updated
+}
+
+// Flutter source mapping, it's specific to your directory structure
 flutter {
     source = "../.."
 }

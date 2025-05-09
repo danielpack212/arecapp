@@ -1,7 +1,9 @@
+import 'dart:async';  
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // Ensure this is imported
 import 'firebase_options.dart';
 import 'home_page.dart';
 import 'maintenance_log_page.dart';
@@ -9,6 +11,7 @@ import 'profile_page.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 import 'landing_page.dart';
+import 'notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,8 +23,19 @@ Future<void> main() async {
     );
   } catch (e) {
     print("Error initializing Firebase: $e");
-    // Optionally handle error (e.g., navigate to an error page, show a message)
   }
+
+  // Create Notification Service instance
+  NotificationService notificationService = NotificationService();
+  await notificationService.initializeLocalNotifications(); // For mobile platforms
+
+  // Request Notification Permissions
+  NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(); // Use this directly
+  print("Notification permission status: ${settings.authorizationStatus}");
+
+  // Get FCM Token
+  String? token = await FirebaseMessaging.instance.getToken(); // Use this directly
+  print("FCM Token: $token");  // Log the token for debugging
 
   runApp(MyApp());
 }
@@ -75,7 +89,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _pages = [
     MaintenanceLogPage(),
-    ChatbotPage(),
+    ChatbotPage(), // Ensure ChatbotPage is defined in your imports
     ProfilePage(),
   ];
 
@@ -96,24 +110,15 @@ class _MainNavigationState extends State<MainNavigation> {
           ? [
               TextButton(
                 onPressed: () => _onItemTapped(0),
-                child: Text(
-                  'Maintenance',
-                  style: TextStyle(color: Colors.white),
-                ),
+                child: Text('Maintenance', style: TextStyle(color: Colors.white)),
               ),
               TextButton(
                 onPressed: () => _onItemTapped(1),
-                child: Text(
-                  'Chat',
-                  style: TextStyle(color: Colors.white),
-                ),
+                child: Text('Chat', style: TextStyle(color: Colors.white)),
               ),
               TextButton(
                 onPressed: () => _onItemTapped(2),
-                child: Text(
-                  'Profile',
-                  style: TextStyle(color: Colors.white),
-                ),
+                child: Text('Profile', style: TextStyle(color: Colors.white)),
               ),
             ]
           : null,

@@ -13,7 +13,10 @@ class _SignUpPageState extends State<SignUpPage> {
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _roleController = TextEditingController();
+  
+  String? _selectedRole; // To hold the selected value from the dropdown
+  final List<String> _roles = ['Maintenance Technician', 'Energy Expert']; // Dropdown items
+
   bool _obscurePassword = true;
   String error = '';
 
@@ -28,7 +31,7 @@ class _SignUpPageState extends State<SignUpPage> {
       await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
-        'role': _roleController.text.trim(),
+        'role': _selectedRole, // Store the selected role
         'email': _emailController.text.trim(),
       });
 
@@ -69,9 +72,21 @@ class _SignUpPageState extends State<SignUpPage> {
               decoration: _inputDecoration('Phone Number'),
             ),
             SizedBox(height: 16),
-            TextField(
-              controller: _roleController,
-              decoration: _inputDecoration('Role'),
+            // Dropdown for role selection
+            DropdownButtonFormField<String>(
+              value: _selectedRole,
+              onChanged: (value) {
+                setState(() {
+                  _selectedRole = value;
+                });
+              },
+              decoration: InputDecoration(labelText: 'Select Role'),
+              items: _roles.map((role) {
+                return DropdownMenuItem<String>(
+                  value: role,
+                  child: Text(role),
+                );
+              }).toList(),
             ),
             SizedBox(height: 16),
             TextField(
