@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'home_page.dart';
 import 'maintenance_log_page.dart';
@@ -9,7 +11,6 @@ import 'profile_page.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 import 'notification_service.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -50,8 +51,8 @@ Future<void> _setupFlutterNotifications() async {
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'high_importance_channel', // ID
-    'High Importance Notifications', // Name
+    'high_importance_channel',
+    'High Importance Notifications',
     importance: Importance.high,
   );
 
@@ -88,9 +89,9 @@ class AuthGate extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         } else if (snapshot.hasData) {
-          return MainNavigation(); // Authenticated
+          return MainNavigation();
         } else {
-          return LoginPage(); // Not authenticated
+          return LoginPage();
         }
       },
     );
@@ -197,28 +198,63 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.grey[900],
-        title: const Text('Study Abroad', style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-      ),
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.grey[900],
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.grey[500],
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.build), label: 'Maintenance'),
-          BottomNavigationBarItem(icon: Icon(Icons.lightbulb), label: 'Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        type: BottomNavigationBarType.fixed,
-      ),
-    );
+    if (kIsWeb) {
+      // Web version with top navigation bar
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.grey[900],
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Study Abroad', style: TextStyle(color: Colors.white)),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () => _onItemTapped(0),
+                    child: Text('Maintenance', style: TextStyle(color: _selectedIndex == 0 ? Colors.white : Colors.grey[400])),
+                  ),
+                  SizedBox(width: 20),
+                  TextButton(
+                    onPressed: () => _onItemTapped(1),
+                    child: Text('Chat', style: TextStyle(color: _selectedIndex == 1 ? Colors.white : Colors.grey[400])),
+                  ),
+                  SizedBox(width: 20),
+                  TextButton(
+                    onPressed: () => _onItemTapped(2),
+                    child: Text('Profile', style: TextStyle(color: _selectedIndex == 2 ? Colors.white : Colors.grey[400])),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        body: _pages[_selectedIndex],
+      );
+    } else {
+      // Android version with bottom navigation bar
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.grey[900],
+          title: const Text('Study Abroad', style: TextStyle(color: Colors.white)),
+          centerTitle: true,
+        ),
+        body: _pages[_selectedIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: Colors.grey[900],
+          selectedItemColor: Colors.white,
+          unselectedItemColor: Colors.grey[500],
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.build), label: 'Maintenance'),
+            BottomNavigationBarItem(icon: Icon(Icons.lightbulb), label: 'Chat'),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          type: BottomNavigationBarType.fixed,
+        ),
+      );
+    }
   }
 }
