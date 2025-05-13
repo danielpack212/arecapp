@@ -16,7 +16,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -36,13 +36,11 @@ android {
 
 // Adding dependencies correctly in Kotlin DSL
 dependencies {
-    // Firebase BoM
-    implementation(platform("com.google.firebase:firebase-bom:30.3.1")) // Use the Firebase Bill of Materials for version management
-    implementation("com.google.firebase:firebase-messaging-ktx") // Firebase Messaging
-    implementation("com.google.firebase:firebase-analytics-ktx") // Firebase Analytics, if needed
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4") // Required for certain compatibility features
-    implementation("androidx.appcompat:appcompat:1.6.1") // Ensure this is updated
-    implementation("androidx.core:core-ktx:1.10.1") // Ensure this is updated
+    // Use Firebase BoM for dependency version management
+    implementation(platform("com.google.firebase:firebase-bom:30.3.1")) // Use the latest version available for Firebase BoM
+    implementation("com.google.firebase:firebase-messaging-ktx") // For Firebase Messaging
+    implementation("com.google.firebase:firebase-analytics-ktx") // Optional, for Firebase Analytics
+    coreLibraryDesugaring ("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
 // Flutter source mapping, it's specific to your directory structure
