@@ -1,9 +1,9 @@
-import 'dart:async';  
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // Ensure this is imported
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'home_page.dart';
 import 'maintenance_log_page.dart';
@@ -29,13 +29,18 @@ Future<void> main() async {
   NotificationService notificationService = NotificationService();
   await notificationService.initializeLocalNotifications(); // For mobile platforms
 
-  // Request Notification Permissions
-  NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(); // Use this directly
-  print("Notification permission status: ${settings.authorizationStatus}");
+  // Register background message handler
+  FirebaseMessaging.onBackgroundMessage(notificationService.onBackgroundMessage);
 
-  // Get FCM Token
-  String? token = await FirebaseMessaging.instance.getToken(); // Use this directly
-  print("FCM Token: $token");  // Log the token for debugging
+  // Request Notification Permissions only for mobile platforms
+  if (!kIsWeb) {  // Only proceed with mobile logic
+    NotificationSettings settings = await FirebaseMessaging.instance.requestPermission();
+    print("Notification permission status: ${settings.authorizationStatus}");
+
+    // Get FCM Token
+    String? token = await FirebaseMessaging.instance.getToken();
+    print("FCM Token: $token");
+  }
 
   runApp(MyApp());
 }
@@ -89,7 +94,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _pages = [
     MaintenanceLogPage(),
-    ChatbotPage(), // Ensure ChatbotPage is defined in your imports
+    ChatbotPage(),
     ProfilePage(),
   ];
 
@@ -103,25 +108,25 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Study Abroad', style: TextStyle(color: Colors.white)),
+        title: const Text('Maintenance Chatbot App', style: TextStyle(color: Colors.white)),
         centerTitle: true,
         backgroundColor: Colors.grey[900],
         actions: kIsWeb 
-          ? [
-              TextButton(
-                onPressed: () => _onItemTapped(0),
-                child: Text('Maintenance', style: TextStyle(color: Colors.white)),
-              ),
-              TextButton(
-                onPressed: () => _onItemTapped(1),
-                child: Text('Chat', style: TextStyle(color: Colors.white)),
-              ),
-              TextButton(
-                onPressed: () => _onItemTapped(2),
-                child: Text('Profile', style: TextStyle(color: Colors.white)),
-              ),
-            ]
-          : null,
+            ? [
+                TextButton(
+                  onPressed: () => _onItemTapped(0),
+                  child: Text('Maintenance', style: TextStyle(color: Colors.white)),
+                ),
+                TextButton(
+                  onPressed: () => _onItemTapped(1),
+                  child: Text('Chat', style: TextStyle(color: Colors.white)),
+                ),
+                TextButton(
+                  onPressed: () => _onItemTapped(2),
+                  child: Text('Profile', style: TextStyle(color: Colors.white)),
+                ),
+              ]
+            : null,
       ),
       body: IndexedStack(
         index: _selectedIndex,
