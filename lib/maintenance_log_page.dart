@@ -28,27 +28,25 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
       'location': 'Hofburg',
       'status': 'Action Required',
       'technician': 'Unassigned',
-      'technicianOptions': ['Unassigned', 'Ethan R., Manager', 'Michael S., Technician', 'Any Available'],
+      'technicianOptions': ['Ethan R., Manager', 'Michael S., Technician', 'Any Available'],
       'dateOpened': '16-04-2025',
       'ticketId': 'CTH178',
+      'isExpanded': false,
     },
     {
       'symptom': 'Electrical Shortage',
       'classification': 'Electrical',
+      'subSymptoms': [
+        {'name': 'Overloaded Circuit', 'percentage': 30},
+        {'name': 'Faulty Wiring', 'percentage': 15},
+      ],
       'location': 'TUWien',
       'status': 'Resolved',
       'technician': 'Mark G.',
+      'technicianOptions': ['Mark G.', 'Sarah L., Electrician', 'Any Available'],
       'dateOpened': '04-04-2025',
       'ticketId': 'CTH179',
-    },
-    {
-      'symptom': 'AC Malfunction',
-      'classification': 'HVAC',
-      'location': 'Hofburg',
-      'status': 'In Progress',
-      'technician': 'Sarah L.',
-      'dateOpened': '10-04-2025',
-      'ticketId': 'CTH180',
+      'isExpanded': false,
     },
   ];
 
@@ -83,14 +81,8 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Maintenance Log',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
             SizedBox(height: 16),
             _buildFilterBar(),
-            SizedBox(height: 16),
-            _buildSearchBar(),
             SizedBox(height: 16),
             _buildTableHeader(),
             Expanded(
@@ -106,70 +98,100 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   Widget _buildFilterBar() {
     return Row(
       children: [
-        _buildFilterDropdown('Classification', classifications, selectedClassification, (value) {
-          setState(() => selectedClassification = value!);
-        }),
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildFilterButton('Classification', classifications, selectedClassification, (value) {
+                setState(() => selectedClassification = value!);
+              }),
+              _buildFilterButton('Status', statuses, selectedStatus, (value) {
+                setState(() => selectedStatus = value!);
+              }),
+              _buildFilterButton('Location', locations, selectedLocation, (value) {
+                setState(() => selectedLocation = value!);
+              }),
+              _buildSortByButton(),
+            ],
+          ),
+        ),
         SizedBox(width: 16),
-        _buildFilterDropdown('Status', statuses, selectedStatus, (value) {
-          setState(() => selectedStatus = value!);
-        }),
-        SizedBox(width: 16),
-        _buildFilterDropdown('Location', locations, selectedLocation, (value) {
-          setState(() => selectedLocation = value!);
-        }),
-        SizedBox(width: 16),
-        _buildSortByDropdown(),
+        Expanded(
+          child: _buildSearchBar(),
+        ),
       ],
     );
   }
 
-  Widget _buildFilterDropdown(String label, List<String> items, String value, void Function(String?) onChanged) {
-    return DropdownButton<String>(
-      value: value,
-      onChanged: onChanged,
-      items: items.map<DropdownMenuItem<String>>((String value) {
-        return DropdownMenuItem<String>(
-          value: value,
-          child: Text(value),
-        );
-      }).toList(),
+  Widget _buildFilterButton(String label, List<String> items, String value, void Function(String?) onChanged) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: PopupMenuButton<String>(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(value == 'All' ? label : value),
+              SizedBox(width: 8),
+              Icon(Icons.arrow_drop_down),
+            ],
+          ),
+        ),
+        onSelected: onChanged,
+        itemBuilder: (BuildContext context) {
+          return items.map<PopupMenuItem<String>>((String item) {
+            return PopupMenuItem<String>(
+              value: item,
+              child: Text(item),
+            );
+          }).toList();
+        },
+      ),
     );
   }
 
-  Widget _buildSortByDropdown() {
-    return Row(
-      children: [
-        Text('Sort By:'),
-        SizedBox(width: 8),
-        DropdownButton<String>(
-          value: sortBy,
-          onChanged: (String? newValue) {
-            setState(() {
-              if (sortBy == newValue) {
-                sortAscending = !sortAscending;
-              } else {
-                sortBy = newValue!;
-                sortAscending = true;
-              }
-            });
-          },
-          items: <String>['Date Opened', 'Status']
-              .map<DropdownMenuItem<String>>((String value) {
-            return DropdownMenuItem<String>(
+  Widget _buildSortByButton() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: PopupMenuButton<String>(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Sort By: $sortBy'),
+              SizedBox(width: 8),
+              Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
+            ],
+          ),
+        ),
+        onSelected: (String? newValue) {
+          setState(() {
+            if (sortBy == newValue) {
+              sortAscending = !sortAscending;
+            } else {
+              sortBy = newValue!;
+              sortAscending = true;
+            }
+          });
+        },
+        itemBuilder: (BuildContext context) {
+          return <String>['Date Opened', 'Status'].map<PopupMenuItem<String>>((String value) {
+            return PopupMenuItem<String>(
               value: value,
               child: Text(value),
             );
-          }).toList(),
-        ),
-        IconButton(
-          icon: Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
-          onPressed: () {
-            setState(() {
-              sortAscending = !sortAscending;
-            });
-          },
-        ),
-      ],
+          }).toList();
+        },
+      ),
     );
   }
 
@@ -181,6 +203,7 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
         ),
+        contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
       ),
       onChanged: (value) {
         setState(() {
@@ -192,19 +215,33 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
 
   Widget _buildTableHeader() {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey)),
+        border: Border(
+          bottom: BorderSide(color: Colors.black),
+        ),
       ),
       child: Row(
         children: [
-          Expanded(flex: 2, child: Text('Symptom? Detection', style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(child: Text('Location', style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(child: Text('Technician', style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(child: Text('Date Opened', style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(child: Text('Ticket ID', style: TextStyle(fontWeight: FontWeight.bold))),
+          _buildHeaderCell('Symptom? Detection', flex: 2),
+          _buildHeaderCell('Location'),
+          _buildHeaderCell('Status'),
+          _buildHeaderCell('Technician'),
+          _buildHeaderCell('Date Opened'),
+          _buildHeaderCell('Ticket ID'),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderCell(String text, {int flex = 1}) {
+    return Expanded(
+      flex: flex,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Text(
+          text,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -212,54 +249,108 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   Widget _buildTable() {
     return ListView.builder(
       itemCount: filteredAndSortedData.length,
-      itemBuilder: (context, index) => _buildTableRow(filteredAndSortedData[index]),
+      itemBuilder: (context, index) => _buildExpandableTableRow(filteredAndSortedData[index]),
     );
   }
 
-  Widget _buildTableRow(Map<String, dynamic> data) {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Column(
+  Widget _buildExpandableTableRow(Map<String, dynamic> data) {
+    return Column(
+      children: [
+        GestureDetector(
+          onDoubleTap: () {
+            _showDetailPopup(context, data);
+          },
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                data['isExpanded'] = !data['isExpanded'];
+              });
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey[300]!),
+                ),
+              ),
+              child: Row(
+                children: [
+                  _buildRowCell(
+                    Row(
+                      children: [
+                        Icon(data['isExpanded'] ? Icons.arrow_drop_down : Icons.arrow_right),
+                        Expanded(child: Text(data['symptom'], style: TextStyle(fontWeight: FontWeight.bold))),
+                      ],
+                    ),
+                    flex: 2,
+                  ),
+                  _buildRowCell(Text(data['location'])),
+                  _buildRowCell(Text(data['status'])),
+                  _buildRowCell(
+                    Row(
+                      children: [
+                        Expanded(child: Text(data['technician'])),
+                        Icon(data['isExpanded'] ? Icons.arrow_drop_down : Icons.arrow_right),
+                      ],
+                    ),
+                  ),
+                  _buildRowCell(Text(data['dateOpened'])),
+                  _buildRowCell(Text(data['ticketId'])),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (data['isExpanded'])
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[300]!),
+              ),
+            ),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(data['symptom'], style: TextStyle(fontWeight: FontWeight.bold)),
-                if (data['subSymptoms'] != null)
-                  ...data['subSymptoms'].map<Widget>((subSymptom) {
-                    return Text('${subSymptom['name']} ${subSymptom['percentage']}%');
-                  }).toList(),
+                _buildRowCell(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Sub-symptoms:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ...data['subSymptoms'].map<Widget>((subSymptom) {
+                        return Text('${subSymptom['name']}: ${subSymptom['percentage']}%');
+                      }).toList(),
+                    ],
+                  ),
+                  flex: 2,
+                ),
+                _buildRowCell(SizedBox()),
+                _buildRowCell(SizedBox()),
+                _buildRowCell(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Technician options:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ...data['technicianOptions'].map<Widget>((option) {
+                        return Text(option);
+                      }).toList(),
+                    ],
+                  ),
+                ),
+                _buildRowCell(SizedBox()),
+                _buildRowCell(SizedBox()),
               ],
             ),
           ),
-          Expanded(child: Text(data['location'])),
-          Expanded(child: Text(data['status'])),
-          Expanded(
-            child: data['technicianOptions'] != null
-                ? DropdownButton<String>(
-                    value: data['technician'],
-                    items: data['technicianOptions'].map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        data['technician'] = newValue!;
-                      });
-                    },
-                  )
-                : Text(data['technician']),
-          ),
-          Expanded(child: Text(data['dateOpened'])),
-          Expanded(child: Text(data['ticketId'])),
-        ],
+      ],
+    );
+  }
+
+  Widget _buildRowCell(Widget child, {int flex = 1}) {
+    return Expanded(
+      flex: flex,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: child,
       ),
     );
   }
@@ -273,6 +364,121 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
           // Implement create new task functionality
         },
       ),
+    );
+  }
+
+  void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.8,
+            height: MediaQuery.of(context).size.height * 0.8,
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${data['symptom']}',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    Text('${data['location']}'),
+                    Text('Status: ${data['status']}'),
+                    Text('Ticket #${data['ticketId']}'),
+                    Text('Opened ${data['dateOpened']}'),
+                  ],
+                ),
+                SizedBox(height: 20),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildDetailSection('Classifications', [
+                          'Plumbing',
+                          'Water Damage',
+                          'Emergency',
+                          'Structural',
+                          'Utility',
+                        ]),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: _buildDetailSection('Available Technicians', [
+                          'Ethan R., Manager',
+                          'Michael S., Technician',
+                          'Sarah L., Plumber',
+                          'John D., Emergency Response',
+                          'Any Available',
+                        ]),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: _buildDetailSection('Maintenance Log', [
+                          'Historically, pipe bursts have been addressed by:',
+                          '1. Immediate water shutoff to prevent further damage',
+                          '2. Assessment of the extent of water damage',
+                          '3. Locating and repairing the burst pipe',
+                          '4. Drying and dehumidifying affected areas',
+                          '5. Checking for mold growth and treating if necessary',
+                          '6. Restoring any damaged structures or furnishings',
+                          '',
+                          'Average resolution time: 2-5 days depending on severity.',
+                          'Common causes: freezing temperatures, age of pipes, high water pressure, or physical damage.',
+                        ]),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: ElevatedButton(
+                    child: Text('Close Ticket Summary'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailSection(String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        SizedBox(height: 8),
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  items[index],
+                  style: TextStyle(color: Colors.white),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

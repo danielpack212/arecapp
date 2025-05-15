@@ -10,17 +10,22 @@ class ChatbotPage extends StatefulWidget {
 class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _controller = TextEditingController();
   List<List<Map<String, String>>> conversations = [
-    [{'sender': 'bot', 'text': 'Welcome to Chat 0!'}],
-    [{'sender': 'bot', 'text': 'Welcome to Chat 1!'}],
-    [{'sender': 'bot', 'text': 'Welcome to Chat 2!'}],
+    [{'sender': 'bot', 'text': 'Welcome to the Pipe Burst chat! How can I assist you with this issue?'}],
+    [{'sender': 'bot', 'text': 'Welcome to the Electrical Shortage chat! What details can you provide about the problem?'}],
+    [{'sender': 'bot', 'text': 'Welcome to the Other Issues chat! Please describe the maintenance problem you\'re facing.'}],
   ]; 
   int selectedConversationIndex = 0;
+
+  List<String> chatTitles = ['Pipe Burst', 'Electrical Shortage', 'Other Issues'];
 
   void _sendMessage(String message) {
     if (message.trim().isEmpty) return;
     setState(() {
       conversations[selectedConversationIndex].add({'sender': 'user', 'text': message});
-      conversations[selectedConversationIndex].add({'sender': 'bot', 'text': 'Thanks for your message!'});
+      conversations[selectedConversationIndex].add({
+        'sender': 'bot', 
+        'text': 'Thank you for providing information about the ${chatTitles[selectedConversationIndex]}. A technician will review your message and respond shortly.'
+      });
     });
     _controller.clear();
   }
@@ -46,14 +51,14 @@ class _ChatbotPageState extends State<ChatbotPage> {
     return Scaffold(
       appBar: !kIsWeb
           ? AppBar(
-              title: Text('Chatbot', style: TextStyle(color: Colors.white)),
+              title: Text('Maintenance Chat', style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.grey[900],
             )
           : null,
       body: Row(
         children: [
           Sidebar(
-            conversations: List.generate(conversations.length, (index) => 'Chat $index'),
+            conversations: chatTitles,
             onConversationSelected: (index) {
               setState(() {
                 selectedConversationIndex = index;
@@ -66,7 +71,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
               children: [
                 Expanded(
                   child: ListView.builder(
-                    padding: EdgeInsets.all(8),  // Add padding if needed
+                    padding: EdgeInsets.all(8),
                     itemCount: conversations[selectedConversationIndex].length,
                     itemBuilder: (context, index) {
                       return _buildMessage(conversations[selectedConversationIndex][index]);
