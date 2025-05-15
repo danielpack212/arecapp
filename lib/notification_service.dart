@@ -2,35 +2,34 @@ import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart'; // Ensure Colors import
 
 class NotificationService {
   FirebaseMessaging messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  FlutterLocalNotificationsPlugin();
 
   Stream<RemoteMessage> get onMessage => FirebaseMessaging.onMessage;
 
   Future<void> initializeLocalNotifications() async {
-    // Initialize the Android settings for local notifications
     const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const InitializationSettings settings =
-        InitializationSettings(android: androidSettings);
+    const InitializationSettings initializationSettings =
+    InitializationSettings(android: androidSettings);
 
     // Initialize local notifications
-    await flutterLocalNotificationsPlugin.initialize(settings);
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
     // Create a notification channel
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       'high_importance_channel', // Must match your notification channel ID
       'High Importance Notifications',
-      description: 'Used for important notifications',
+      description: 'This channel is used for important notifications.',
       importance: Importance.high,
-      playSound: true,        // Play sound
+      playSound: true,        // Enable sound
       enableLights: true,     // Enable lights
       enableVibration: true,  // Enable vibration
-      // lightColor: Colors.blue, // REMOVE this line as this may raise an error if not defined
     );
 
     // Create the notification channel
@@ -84,11 +83,11 @@ class NotificationService {
           android: AndroidNotificationDetails(
             'high_importance_channel', // Ensure this matches your channel ID
             'High Importance Notifications',
-            channelDescription: 'Used for important notifications',
+            channelDescription: 'This channel is used for important notifications.',
             importance: Importance.high,  // Important for heads-up notification
             priority: Priority.high,       // High priority for critical alerts
-            playSound: true,               // Enable sound
-            enableLights: true,            // Enable lights
+            playSound: true,               // Ensure sound is played
+            enableLights: true,            // Ensure lights are enabled
             enableVibration: true,         // Enable vibration
             icon: '@mipmap/ic_launcher',   // The icon to show with the notification
           ),

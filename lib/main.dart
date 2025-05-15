@@ -34,30 +34,18 @@ Future<void> main() async {
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  await _setupFlutterNotifications();
+  // Initialize the NotificationService
+  final notificationService = NotificationService();
+  await notificationService.initializeLocalNotifications();
+
+  // Listen for messages when the app is in the foreground
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    if (message.notification != null) {
+      notificationService.showLocalNotification(message);
+    }
+  });
 
   runApp(MyApp());
-}
-
-Future<void> _setupFlutterNotifications() async {
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-  );
-
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'high_importance_channel', // ID
-    'High Importance Notifications', // Name
-    importance: Importance.high,
-  );
-
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
 }
 
 class MyApp extends StatelessWidget {
@@ -103,7 +91,6 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  final NotificationService _notificationService = NotificationService();
   int _selectedIndex = 1;
 
   final List<Widget> _pages = [
@@ -111,83 +98,6 @@ class _MainNavigationState extends State<MainNavigation> {
     ChatbotPage(),
     ProfilePage(),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _initNotifications();
-  }
-
-  Future<void> _initNotifications() async {
-    final authStatus = await _notificationService.requestNotificationPermissions();
-    if (authStatus == AuthorizationStatus.authorized || authStatus == AuthorizationStatus.provisional) {
-      final token = await _notificationService.getFCMToken();
-      print("FCM Token: $token");
-      if (token != null) {
-        final success = await _notificationService.sendTokenToServer(token);
-        if (!success) {
-          _showErrorDialog('Failed to send token to server.');
-        }
-      }
-    }
-
-    FirebaseMessaging.onMessage.listen((message) {
-      if (message.notification != null) {
-        final notification = message.notification!;
-        final android = message.notification?.android;
-        if (android != null) {
-          flutterLocalNotificationsPlugin.show(
-            notification.hashCode,
-            notification.title,
-            notification.body,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                'high_importance_channel',
-                'High Importance Notifications',
-                importance: Importance.high,
-                priority: Priority.high,
-                showWhen: true,
-              ),
-            ),
-          );
-        } else {
-          _showNotificationDialog(notification.title ?? 'No Title', notification.body ?? 'No Body');
-        }
-      }
-    });
-  }
-
-  void _showNotificationDialog(String title, String body) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
-          )
-        ],
-      ),
-    );
-  }
-
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Error'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
-          )
-        ],
-      ),
-    );
-  }
 
   void _onItemTapped(int index) {
     setState(() {

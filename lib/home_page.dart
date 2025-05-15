@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert'; // For jsonEncode
+import 'package:speech_to_text/speech_to_text.dart' as stt; // Import the speech_to_text package
 
 class ChatbotPage extends StatefulWidget {
   @override
@@ -9,6 +10,7 @@ class ChatbotPage extends StatefulWidget {
 
 class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController(); // Scroll controller
 
   // Sample conversations for demonstration
   List<List<Map<String, String>>> conversations = [
@@ -17,6 +19,10 @@ class _ChatbotPageState extends State<ChatbotPage> {
     [{'sender': 'bot', 'text': 'Welcome to Chat 3!'}],
   ];
   int selectedConversationIndex = 0;
+
+  bool _isListening = false;  // Track if the microphone is listening
+  String _speechText = '';     // Store recognized speech input
+  stt.SpeechToText _speech = stt.SpeechToText(); // Speech recognition instance
 
   void _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
@@ -28,6 +34,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
     // Clear the input field
     _controller.clear();
+
+    // Scroll to the bottom after sending a message
+    _scrollToBottom();
 
     try {
       final response = await http.post(
@@ -58,6 +67,44 @@ class _ChatbotPageState extends State<ChatbotPage> {
         conversations[selectedConversationIndex].add({'sender': 'bot', 'text': 'Error: ${e.toString()}'});
       });
     }
+
+    // Scroll to the bottom after receiving a response
+    _scrollToBottom();
+  }
+
+  // Method to scroll to the bottom of the chat messages
+  void _scrollToBottom() {
+    Future.delayed(Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  void _startListening() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize();
+      if (available) {
+        setState(() {
+          _isListening = true; // Start listening for voice input
+          _speechText = '';    // Clear previous text
+        });
+
+        _speech.listen(onResult: (result) {
+          setState(() {
+            _speechText = result.recognizedWords; // Update recognized text
+            _controller.text = _speechText;       // Populate input field
+          });
+        });
+      }
+    }
+  }
+
+  void _stopListening() async {
+    await _speech.stop();
+    setState(() {
+      _isListening = false; // Stop listening
+    });
   }
 
   Widget _buildMessage(Map<String, String> message) {
@@ -90,7 +137,8 @@ class _ChatbotPageState extends State<ChatbotPage> {
             icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
             onChanged: (int? newValue) {
               setState(() {
-                selectedConversationIndex = newValue! - 1; // Indexing from 0 (1, 2, 3 -> 0, 1, 2)
+                selectedConversationIndex = newValue! - 1; // Convert 1,2,3 to 0,1,2
+                _scrollToBottom(); // Scroll to the bottom when changing chats
               });
             },
             items: [
@@ -114,6 +162,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: _scrollController, // Assign the controller
               padding: EdgeInsets.all(8),
               itemCount: conversations[selectedConversationIndex].length,
               itemBuilder: (context, index) {
@@ -130,7 +179,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    onSubmitted: (value) => _sendMessage(value),
+                    onSubmitted: (value) {
+                      _sendMessage(value); // Send message on submit
+                    },
                     style: TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Type your message...',
@@ -147,6 +198,19 @@ class _ChatbotPageState extends State<ChatbotPage> {
                 ),
                 SizedBox(width: 8),
                 IconButton(
+                  icon: Icon(
+                      Icons.mic,
+                      color: _isListening ? Colors.red : Colors.white  // Highlight mic icon red when recording
+                  ),
+                  onPressed: () {
+                    if (_isListening) {
+                      _stopListening(); // Stop listening
+                    } else {
+                      _startListening(); // Start voice input listening
+                    }
+                  },
+                ),
+                IconButton(
                   icon: Icon(Icons.send, color: Colors.white),
                   onPressed: () => _sendMessage(_controller.text),
                 ),
@@ -155,7 +219,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
           ),
         ],
       ),
-      resizeToAvoidBottomInset: true, // Allow the body to resize with the keyboard
+      resizeToAvoidBottomInset: true, // Ensures that layout will adjust when keyboard appears
     );
   }
 }
