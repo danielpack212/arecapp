@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'dart:convert'; // For jsonEncode
-import 'sidebar.dart';  // Import the Sidebar widget
 
 class ChatbotPage extends StatefulWidget {
   @override
@@ -11,10 +9,12 @@ class ChatbotPage extends StatefulWidget {
 
 class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _controller = TextEditingController();
+
+  // Sample conversations for demonstration
   List<List<Map<String, String>>> conversations = [
-    [{'sender': 'bot', 'text': 'Welcome to Chat 0!'}],
     [{'sender': 'bot', 'text': 'Welcome to Chat 1!'}],
     [{'sender': 'bot', 'text': 'Welcome to Chat 2!'}],
+    [{'sender': 'bot', 'text': 'Welcome to Chat 3!'}],
   ];
   int selectedConversationIndex = 0;
 
@@ -31,7 +31,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.204.31:5000/chat'), // Substitute with your Flask server's URL
+        Uri.parse('http://192.168.204.31:5000/chat'), // Your Flask server URL
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
         },
@@ -79,81 +79,83 @@ class _ChatbotPageState extends State<ChatbotPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: !kIsWeb ? AppBar(
+      appBar: AppBar(
         title: Text('Chatbot', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.grey[900],
-        leading: IconButton(
-          icon: Icon(Icons.menu, color: Colors.white),
-          onPressed: () {
-            Scaffold.of(context).openDrawer();
-          },
-        ),
-      ) : null,
-      body: Row(
+        actions: [
+          // Dropdown for selecting chat
+          DropdownButton<int>(
+            dropdownColor: Colors.grey[900],
+            value: selectedConversationIndex + 1,
+            icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+            onChanged: (int? newValue) {
+              setState(() {
+                selectedConversationIndex = newValue! - 1; // Indexing from 0 (1, 2, 3 -> 0, 1, 2)
+              });
+            },
+            items: [
+              DropdownMenuItem<int>(
+                value: 1,
+                child: Text('Chat 1', style: TextStyle(color: Colors.white)),
+              ),
+              DropdownMenuItem<int>(
+                value: 2,
+                child: Text('Chat 2', style: TextStyle(color: Colors.white)),
+              ),
+              DropdownMenuItem<int>(
+                value: 3,
+                child: Text('Chat 3', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ],
+      ),
+      body: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView( // Allow scrolling
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ListView.builder(
-                      padding: EdgeInsets.all(8),
-                      itemCount: conversations[selectedConversationIndex].length,
-                      itemBuilder: (context, index) {
-                        return _buildMessage(conversations[selectedConversationIndex][index]);
-                      },
+            child: ListView.builder(
+              padding: EdgeInsets.all(8),
+              itemCount: conversations[selectedConversationIndex].length,
+              itemBuilder: (context, index) {
+                return _buildMessage(conversations[selectedConversationIndex][index]);
+              },
+            ),
+          ),
+          // Chat input area
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            color: Colors.grey[900],
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    onSubmitted: (value) => _sendMessage(value),
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Type your message...',
+                      hintStyle: TextStyle(color: Colors.grey[400]),
+                      filled: true,
+                      fillColor: Colors.grey[800],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
                     ),
                   ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    color: Colors.grey[900],
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            onSubmitted: (value) => _sendMessage(value),
-                            style: TextStyle(color: Colors.white),
-                            decoration: InputDecoration(
-                              hintText: 'Type your message...',
-                              hintStyle: TextStyle(color: Colors.grey[400]),
-                              filled: true,
-                              fillColor: Colors.grey[800],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        IconButton(
-                          icon: Icon(Icons.send, color: Colors.white),
-                          onPressed: () => _sendMessage(_controller.text),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                SizedBox(width: 8),
+                IconButton(
+                  icon: Icon(Icons.send, color: Colors.white),
+                  onPressed: () => _sendMessage(_controller.text),
+                ),
+              ],
             ),
           ),
         ],
       ),
-      drawer: Drawer(
-        child: Sidebar(
-          conversations: List.generate(conversations.length, (index) => 'Chat $index'),
-          onConversationSelected: (index) {
-            setState(() {
-              selectedConversationIndex = index;
-            });
-            Navigator.of(context).pop(); // Close the drawer after selection
-          },
-          selectedConversationIndex: selectedConversationIndex,
-        ),
-      ),
-      resizeToAvoidBottomInset: true, // Allow the body to resize
+      resizeToAvoidBottomInset: true, // Allow the body to resize with the keyboard
     );
   }
 }

@@ -11,24 +11,31 @@ class NotificationService {
   Stream<RemoteMessage> get onMessage => FirebaseMessaging.onMessage;
 
   Future<void> initializeLocalNotifications() async {
+    // Initialize the Android settings for local notifications
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const InitializationSettings settings =
         InitializationSettings(android: androidSettings);
 
+    // Initialize local notifications
     await flutterLocalNotificationsPlugin.initialize(settings);
 
+    // Create a notification channel
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'high_importance_channel', // Must match server.js
+      'high_importance_channel', // Must match your notification channel ID
       'High Importance Notifications',
       description: 'Used for important notifications',
       importance: Importance.high,
+      playSound: true,        // Play sound
+      enableLights: true,     // Enable lights
+      enableVibration: true,  // Enable vibration
+      // lightColor: Colors.blue, // REMOVE this line as this may raise an error if not defined
     );
 
+    // Create the notification channel
     await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
   }
 
@@ -44,7 +51,7 @@ class NotificationService {
   Future<bool> sendTokenToServer(String token) async {
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:3000/send-token'),
+        Uri.parse('http://10.0.2.2:3000/send-token'), // Update as necessary for your server
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'token': token}),
       );
@@ -75,12 +82,15 @@ class NotificationService {
         notification.body,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            'high_importance_channel',
+            'high_importance_channel', // Ensure this matches your channel ID
             'High Importance Notifications',
             channelDescription: 'Used for important notifications',
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
+            importance: Importance.high,  // Important for heads-up notification
+            priority: Priority.high,       // High priority for critical alerts
+            playSound: true,               // Enable sound
+            enableLights: true,            // Enable lights
+            enableVibration: true,         // Enable vibration
+            icon: '@mipmap/ic_launcher',   // The icon to show with the notification
           ),
         ),
       );
