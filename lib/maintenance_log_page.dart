@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
+import 'user_provider.dart';
 
 class MaintenanceLogPage extends StatefulWidget {
   @override
@@ -48,6 +50,51 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
       'ticketId': 'CTH179',
       'isExpanded': false,
     },
+    {
+    'symptom': 'AC Malfunction',
+    'classification': 'HVAC',
+    'subSymptoms': [
+      {'name': 'Insufficient Cooling', 'percentage': 40},
+      {'name': 'Strange Noise', 'percentage': 10},
+    ],
+    'location': 'Hofburg',
+    'status': 'In Progress',
+    'assignedBy': 'Alice Johnson (Energy Expert)',
+    'technicianOptions': ['Bob K., HVAC Specialist', 'Any Available'],
+    'dateOpened': '10-04-2025',
+    'ticketId': 'CTH180',
+    'isExpanded': false,
+  },
+  {
+    'symptom': 'Lighting Failure',
+    'classification': 'Electrical',
+    'subSymptoms': [
+      {'name': 'Flickering Lights', 'percentage': 25},
+      {'name': 'Dead Bulbs', 'percentage': 75},
+    ],
+    'location': 'TUWien',
+    'status': 'Action Required',
+    'assignedBy': 'Unassigned',
+    'technicianOptions': ['Sarah L., Electrician', 'Mark G.', 'Any Available'],
+    'dateOpened': '12-04-2025',
+    'ticketId': 'CTH181',
+    'isExpanded': false,
+  },
+  {
+    'symptom': 'Water Heater Leak',
+    'classification': 'Plumbing',
+    'subSymptoms': [
+      {'name': 'Puddle Formation', 'percentage': 60},
+      {'name': 'Reduced Hot Water', 'percentage': 40},
+    ],
+    'location': 'Hofburg',
+    'status': 'In Progress',
+    'assignedBy': 'John Doe (Energy Expert)',
+    'technicianOptions': ['Michael S., Technician', 'Ethan R., Manager', 'Any Available'],
+    'dateOpened': '14-04-2025',
+    'ticketId': 'CTH182',
+    'isExpanded': false,
+  },
   ];
 
   List<Map<String, dynamic>> get filteredAndSortedData {
@@ -75,6 +122,8 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
 
   @override
   Widget build(BuildContext context) {
+    final userRole = context.watch<UserProvider>().userRole;
+
     return Scaffold(
       body: Padding(
         padding: EdgeInsets.all(16.0),
@@ -84,10 +133,10 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
             SizedBox(height: 16),
             _buildFilterBar(),
             SizedBox(height: 16),
-            _buildTableHeader(),
-            Expanded(
-              child: _buildTable(),
-            ),
+            _buildTableHeader(userRole),
+          Expanded(
+            child: _buildRoleBasedContent(userRole),
+          ),
             _buildCreateNewTaskButton(),
           ],
         ),
@@ -213,23 +262,26 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
     );
   }
 
-  Widget _buildTableHeader() {
+  Widget _buildTableHeader(String? userRole) {
+        List<Widget> headerCells = [
+      _buildHeaderCell('Symptom? Detection', flex: 2),
+      _buildHeaderCell('Location'),
+      _buildHeaderCell('Status'),
+      _buildHeaderCell('Date Opened'),
+      _buildHeaderCell('Ticket ID'),
+    ];
+        if (userRole == 'Energy Expert') {
+      headerCells.insert(3, _buildHeaderCell('Assigned To'));
+    } else if (userRole == 'Maintenance Technician') {
+      headerCells.insert(3, _buildHeaderCell('Assigned By'));
+    }
     return Container(
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: Colors.black),
         ),
       ),
-      child: Row(
-        children: [
-          _buildHeaderCell('Symptom? Detection', flex: 2),
-          _buildHeaderCell('Location'),
-          _buildHeaderCell('Status'),
-          _buildHeaderCell('Technician'),
-          _buildHeaderCell('Date Opened'),
-          _buildHeaderCell('Ticket ID'),
-        ],
-      ),
+      child: Row(children: headerCells),
     );
   }
 
@@ -245,15 +297,54 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
       ),
     );
   }
-
-  Widget _buildTable() {
+  Widget _buildRoleBasedContent(String? userRole) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (userRole == 'Maintenance Technician')
+        Text('Maintenance Technician View', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      if (userRole == 'Energy Expert')
+        Text('Energy Expert View', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      SizedBox(height: 10),
+      Expanded(child: _buildTable(userRole)),
+      if (userRole == 'Energy Expert') ...[
+        SizedBox(height: 10),
+        Text('Energy Consumption Analysis', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        // Add energy consumption analysis widgets here
+      ],
+    ],
+  );
+}
+  Widget _buildTable(String? userRole) {
     return ListView.builder(
       itemCount: filteredAndSortedData.length,
-      itemBuilder: (context, index) => _buildExpandableTableRow(filteredAndSortedData[index]),
+      itemBuilder: (context, index) => _buildExpandableTableRow(filteredAndSortedData[index], userRole),
     );
   }
 
-  Widget _buildExpandableTableRow(Map<String, dynamic> data) {
+  Widget _buildExpandableTableRow(Map<String, dynamic> data, String? userRole) {
+        List<Widget> rowCells = [
+      _buildRowCell(
+        Row(
+          children: [
+            Icon(data['isExpanded'] ? Icons.arrow_drop_down : Icons.arrow_right),
+            Expanded(child: Text(data['symptom'], style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+        flex: 2,
+      ),
+      _buildRowCell(Text(data['location'])),
+      _buildRowCell(Text(data['status'])),
+      _buildRowCell(Text(data['dateOpened'])),
+      _buildRowCell(Text(data['ticketId'])),
+    ];
+
+    if (userRole == 'Energy Expert') {
+      rowCells.insert(3, _buildRowCell(Text(data['assignedTo'] ?? 'Unassigned')));
+    } else if (userRole == 'Maintenance Technician') {
+      rowCells.insert(3, _buildRowCell(Text(data['assignedBy'] ?? 'Unassigned')));
+    }
+
     return Column(
       children: [
         GestureDetector(
@@ -272,79 +363,54 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
                   bottom: BorderSide(color: Colors.grey[300]!),
                 ),
               ),
-              child: Row(
-                children: [
-                  _buildRowCell(
-                    Row(
-                      children: [
-                        Icon(data['isExpanded'] ? Icons.arrow_drop_down : Icons.arrow_right),
-                        Expanded(child: Text(data['symptom'], style: TextStyle(fontWeight: FontWeight.bold))),
-                      ],
-                    ),
-                    flex: 2,
-                  ),
-                  _buildRowCell(Text(data['location'])),
-                  _buildRowCell(Text(data['status'])),
-                  _buildRowCell(
-                    Row(
-                      children: [
-                        Expanded(child: Text(data['technician'])),
-                        Icon(data['isExpanded'] ? Icons.arrow_drop_down : Icons.arrow_right),
-                      ],
-                    ),
-                  ),
-                  _buildRowCell(Text(data['dateOpened'])),
-                  _buildRowCell(Text(data['ticketId'])),
-                ],
+              child: Row( children: rowCells),
               ),
             ),
           ),
-        ),
         if (data['isExpanded'])
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!),
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildRowCell(
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Sub-symptoms:', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ...data['subSymptoms'].map<Widget>((subSymptom) {
-                        return Text('${subSymptom['name']}: ${subSymptom['percentage']}%');
-                      }).toList(),
-                    ],
-                  ),
-                  flex: 2,
-                ),
-                _buildRowCell(SizedBox()),
-                _buildRowCell(SizedBox()),
-                _buildRowCell(
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Technician options:', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ...data['technicianOptions'].map<Widget>((option) {
-                        return Text(option);
-                      }).toList(),
-                    ],
-                  ),
-                ),
-                _buildRowCell(SizedBox()),
-                _buildRowCell(SizedBox()),
-              ],
-            ),
-          ),
+        _buildExpandedContent(data, userRole),
       ],
     );
   }
-
+Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
+  return Container(
+    padding: EdgeInsets.all(8),
+    color: Colors.grey[100],
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Sub-symptoms:', style: TextStyle(fontWeight: FontWeight.bold)),
+              ...data['subSymptoms'].map<Widget>((subSymptom) {
+                return Text('${subSymptom['name']}: ${subSymptom['percentage']}%');
+              }).toList(),
+            ],
+          ),
+        ),
+        Expanded(child: SizedBox()), // Empty space for Location
+        Expanded(child: SizedBox()), // Empty space for Status
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(userRole == 'Energy Expert' ? 'Assigned To:' : 'Assigned By:', 
+                   style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(userRole == 'Energy Expert' 
+                   ? (data['assignedTo'] ?? 'Unassigned')
+                   : (data['assignedBy'] ?? 'Unassigned')),
+            ],
+          ),
+        ),
+        Expanded(child: SizedBox()), // Empty space for Date Opened
+        Expanded(child: SizedBox()), // Empty space for Ticket ID
+      ],
+    ),
+  );
+}
   Widget _buildRowCell(Widget child, {int flex = 1}) {
     return Expanded(
       flex: flex,
@@ -367,106 +433,101 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
     );
   }
 
-  void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.8,
-            height: MediaQuery.of(context).size.height * 0.9,
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${data['symptom']}',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                    Text('${data['location']}', style: TextStyle(color: Colors.black)),
-                    Text('Status: ${data['status']}', style: TextStyle(color: Colors.black)),
-                    Text('Ticket #${data['ticketId']}', style: TextStyle(color: Colors.black)),
-                    Text('Opened ${data['dateOpened']}', style: TextStyle(color: Colors.black)),
-                  ],
-                ),
-                SizedBox(height: 20),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: _buildDetailSection('Classifications', [
-                                'Plumbing',
-                                'Water Damage',
-                                'Emergency',
-                                'Structural',
-                                'Utility',
-                              ]),
-                            ),
-                            SizedBox(width: 16),
-                            Expanded(
-                              child: _buildDetailSection('Available Technicians', [
-                                'Ethan R., Manager',
-                                'Michael S., Technician',
-                                'Sarah L., Plumber',
-                                'John D., Emergency Response',
-                                'Any Available',
-                              ]),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 20),
+void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
+  final userRole = context.read<UserProvider>().userRole;
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.8,
+          height: MediaQuery.of(context).size.height * 0.9,
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${data['symptom']}',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  Text('${data['location']}', style: TextStyle(color: Colors.black)),
+                  Text('Status: ${data['status']}', style: TextStyle(color: Colors.black)),
+                  Text('Ticket #${data['ticketId']}', style: TextStyle(color: Colors.black)),
+                  Text('Opened ${data['dateOpened']}', style: TextStyle(color: Colors.black)),
+                ],
+              ),
+              SizedBox(height: 20),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailSection('Classification', [data['classification']], isWide: true),
+                      SizedBox(height: 16),
+                      _buildDetailSection('Sub-symptoms', 
+                        data['subSymptoms'].map<String>((subSymptom) => 
+                          '${subSymptom['name']}: ${subSymptom['percentage']}%'
+                        ).toList(),
+                        isWide: true
+                      ),
+                      SizedBox(height: 16),
+                      if (userRole == 'Energy Expert') ...[
+                        _buildDetailSection('Energy Impact', [
+                          'Estimated energy loss: 150 kWh',
+                          'Potential cost increase: \$30 per day',
+                          'Recommended action: Prioritize repair to minimize energy waste'
+                        ], isWide: true),
+                        SizedBox(height: 16),
+                        _buildDetailSection('Assigned To', [data['assignedTo'] ?? 'Unassigned'], isWide: true),
+                      ] else if (userRole == 'Maintenance Technician') ...[
                         _buildDetailSection('Maintenance Log', [
-                          'Historically, pipe bursts have been addressed by:',
                           '1. Immediate water shutoff to prevent further damage',
                           '2. Assessment of the extent of water damage',
                           '3. Locating and repairing the burst pipe',
                           '4. Drying and dehumidifying affected areas',
                           '5. Checking for mold growth and treating if necessary',
-                          '6. Restoring any damaged structures or furnishings',
-                          '',
-                          'Average resolution time: 2-5 days depending on severity.',
-                          'Common causes: freezing temperatures, age of pipes, high water pressure, or physical damage.',
+                          '6. Restoring any damaged structures or furnishings'
                         ], isWide: true),
+                        SizedBox(height: 16),
+                        _buildDetailSection('Assigned By', [data['assignedBy'] ?? 'Unassigned'], isWide: true),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
+              ),
+              SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (userRole == 'Energy Expert')
                     ElevatedButton(
                       child: Text('Assign Technician'),
                       onPressed: () => _showAssignTechnicianDialog(context, data),
                     ),
-                    ElevatedButton(
-                      child: Text('Close Ticket Summary'),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ElevatedButton(
+                    child: Text('Close Ticket Summary'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildDetailSection(String title, List<String> items, {bool isWide = false}) {
     return Container(

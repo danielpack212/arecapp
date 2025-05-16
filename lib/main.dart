@@ -12,6 +12,9 @@ import 'login_page.dart';
 import 'signup_page.dart';
 import 'notification_service.dart';
 import 'landing_page.dart';
+import 'package:provider/provider.dart';
+import 'user_provider.dart';
+
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -38,7 +41,12 @@ Future<void> main() async {
 
   await _setupFlutterNotifications();
 
-  runApp(MyApp());
+    runApp(
+    ChangeNotifierProvider(
+      create: (context) => UserProvider(),
+      child: MyApp(),
+    ),
+  );
 }
 
 Future<void> _setupFlutterNotifications() async {
@@ -119,6 +127,10 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     _initNotifications();
+    _fetchUserRole();
+  }
+    Future<void> _fetchUserRole() async {
+    await Provider.of<UserProvider>(context, listen: false).fetchUserRole();
   }
 
   Future<void> _initNotifications() async {
