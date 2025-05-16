@@ -372,10 +372,15 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
       context: context,
       builder: (BuildContext context) {
         return Dialog(
+          backgroundColor: Colors.transparent,
           child: Container(
             width: MediaQuery.of(context).size.width * 0.8,
-            height: MediaQuery.of(context).size.height * 0.8,
+            height: MediaQuery.of(context).size.height * 0.9,
             padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -384,41 +389,46 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
                   children: [
                     Text(
                       '${data['symptom']}',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
                     ),
-                    Text('${data['location']}'),
-                    Text('Status: ${data['status']}'),
-                    Text('Ticket #${data['ticketId']}'),
-                    Text('Opened ${data['dateOpened']}'),
+                    Text('${data['location']}', style: TextStyle(color: Colors.black)),
+                    Text('Status: ${data['status']}', style: TextStyle(color: Colors.black)),
+                    Text('Ticket #${data['ticketId']}', style: TextStyle(color: Colors.black)),
+                    Text('Opened ${data['dateOpened']}', style: TextStyle(color: Colors.black)),
                   ],
                 ),
                 SizedBox(height: 20),
                 Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: _buildDetailSection('Classifications', [
-                          'Plumbing',
-                          'Water Damage',
-                          'Emergency',
-                          'Structural',
-                          'Utility',
-                        ]),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: _buildDetailSection('Available Technicians', [
-                          'Ethan R., Manager',
-                          'Michael S., Technician',
-                          'Sarah L., Plumber',
-                          'John D., Emergency Response',
-                          'Any Available',
-                        ]),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: _buildDetailSection('Maintenance Log', [
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: _buildDetailSection('Classifications', [
+                                'Plumbing',
+                                'Water Damage',
+                                'Emergency',
+                                'Structural',
+                                'Utility',
+                              ]),
+                            ),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: _buildDetailSection('Available Technicians', [
+                                'Ethan R., Manager',
+                                'Michael S., Technician',
+                                'Sarah L., Plumber',
+                                'John D., Emergency Response',
+                                'Any Available',
+                              ]),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 20),
+                        _buildDetailSection('Maintenance Log', [
                           'Historically, pipe bursts have been addressed by:',
                           '1. Immediate water shutoff to prevent further damage',
                           '2. Assessment of the extent of water damage',
@@ -429,20 +439,26 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
                           '',
                           'Average resolution time: 2-5 days depending on severity.',
                           'Common causes: freezing temperatures, age of pipes, high water pressure, or physical damage.',
-                        ]),
-                      ),
-                    ],
+                        ], isWide: true),
+                      ],
+                    ),
                   ),
                 ),
                 SizedBox(height: 20),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: ElevatedButton(
-                    child: Text('Close Ticket Summary'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    ElevatedButton(
+                      child: Text('Assign Technician'),
+                      onPressed: () => _showAssignTechnicianDialog(context, data),
+                    ),
+                    ElevatedButton(
+                      child: Text('Close Ticket Summary'),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -452,33 +468,103 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
     );
   }
 
-  Widget _buildDetailSection(String title, List<String> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        SizedBox(height: 8),
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.grey[900],
-            borderRadius: BorderRadius.circular(8),
+  Widget _buildDetailSection(String title, List<String> items, {bool isWide = false}) {
+    return Container(
+      width: isWide ? double.infinity : null,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+            textAlign: TextAlign.center,
           ),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  items[index],
-                  style: TextStyle(color: Colors.white),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+          SizedBox(height: 8),
+          ...items.map((item) => Padding(
+            padding: EdgeInsets.only(bottom: 4),
+            child: Text(
+              item,
+              style: TextStyle(color: Colors.black),
+              textAlign: TextAlign.center,
+            ),
+          )).toList(),
+        ],
+      ),
     );
+  }
+
+  void _showAssignTechnicianDialog(BuildContext context, Map<String, dynamic> data) {
+    List<String> technicians = List<String>.from(data['technicianOptions'] ?? []);
+    if (!technicians.contains('Any Available')) {
+      technicians.add('Any Available');
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Assign Technician'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: technicians.map((String technician) {
+                return ListTile(
+                  title: Text(technician),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showConfirmationDialog(context, data, technician);
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showConfirmationDialog(BuildContext context, Map<String, dynamic> data, String selectedTechnician) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirm Technician Assignment'),
+          content: Text('Are you sure you want to assign $selectedTechnician to this task?'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Confirm'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _assignTechnician(data, selectedTechnician);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+    void _assignTechnician(Map<String, dynamic> data, String selectedTechnician) {
+    // Here you would update the data and send it to the database
+    // For now, we'll just print the assignment
+    print('Assigning $selectedTechnician to task ${data['ticketId']}');
+    
+    // TODO: Implement database update
+    // Example of how you might update the data:
+    // data['technician'] = selectedTechnician;
+    // DatabaseService().updateMaintenanceTask(data['ticketId'], data);
+    
+    // For now, let's update the state to reflect the change
+    setState(() {
+      data['technician'] = selectedTechnician;
+    });
   }
 }

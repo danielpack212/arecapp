@@ -11,6 +11,7 @@ import 'profile_page.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 import 'notification_service.dart';
+import 'landing_page.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -75,6 +76,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => LoginPage(),
         '/signup': (context) => SignUpPage(),
+        '/landing': (context) => LandingPage(),
       },
     );
   }
@@ -91,7 +93,7 @@ class AuthGate extends StatelessWidget {
         } else if (snapshot.hasData) {
           return MainNavigation();
         } else {
-          return LoginPage();
+          return kIsWeb ? LandingPage() : LoginPage();
         }
       },
     );
