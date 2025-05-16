@@ -119,27 +119,177 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
         return 0;
       });
   }
-
+  bool _showMobileFilters = false;
   @override
   Widget build(BuildContext context) {
     final userRole = context.watch<UserProvider>().userRole;
 
-    return Scaffold(
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 16),
-            _buildFilterBar(),
-            SizedBox(height: 16),
-            _buildTableHeader(userRole),
+        return Scaffold(
+          body: kIsWeb
+              ? _buildWebLayout(userRole)
+              : _buildMobileLayout(userRole),
+        );
+      }
+  Widget _buildWebLayout(String? userRole) {
+    return Padding(
+      padding: EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 16),
+          _buildFilterBar(),
+          SizedBox(height: 16),
+          _buildTableHeader(userRole),
           Expanded(
             child: _buildRoleBasedContent(userRole),
           ),
-            _buildCreateNewTaskButton(),
+          _buildCreateNewTaskButton(),
+        ],
+      ),
+    );
+  }
+  Widget _buildMobileLayout(String? userRole) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(userRole == 'Maintenance Technician' ? 'Maintenance View' : 'Energy Expert View'),
+        actions: [
+          IconButton(
+            icon: Icon(_showMobileFilters ? Icons.filter_list_off : Icons.filter_list),
+            onPressed: () {
+              setState(() {
+                _showMobileFilters = !_showMobileFilters;
+              });
+            },
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          // Implement refresh logic here
+          setState(() {
+            // Refresh your data
+          });
+        },
+        child: ListView(
+          children: [
+            if (_showMobileFilters)
+              Padding(
+                padding: EdgeInsets.all(16.0),
+                child: _buildMobileFilterBar(),
+              ),
+            ..._buildMobileRoleBasedContent(userRole),
           ],
         ),
+      ),
+      floatingActionButton: _buildCreateNewTaskButton(),
+    );
+  }
+
+  Widget _buildMobileHeader(String? userRole) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      color: Colors.grey[200],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            userRole == 'Maintenance Technician' ? 'Maintenance View' : 'Energy Expert View',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          IconButton(
+            icon: Icon(_showMobileFilters ? Icons.filter_list_off : Icons.filter_list),
+            onPressed: () {
+              setState(() {
+                _showMobileFilters = !_showMobileFilters;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileFilterBar() {
+    return Column(
+      children: [
+        _buildFilterButton('Classification', classifications, selectedClassification, (value) {
+          setState(() => selectedClassification = value!);
+        }),
+        SizedBox(height: 8),
+        _buildFilterButton('Status', statuses, selectedStatus, (value) {
+          setState(() => selectedStatus = value!);
+        }),
+        SizedBox(height: 8),
+        _buildFilterButton('Location', locations, selectedLocation, (value) {
+          setState(() => selectedLocation = value!);
+        }),
+        SizedBox(height: 8),
+        _buildSortByButton(),
+        SizedBox(height: 8),
+        _buildSearchBar(),
+      ],
+    );
+  }
+
+List<Widget> _buildMobileRoleBasedContent(String? userRole) {
+  List<Widget> content = [
+    ...filteredAndSortedData.map((data) => _buildMobileTableRow(data, userRole)).toList(),
+  ];
+
+  if (userRole == 'Energy Expert') {
+    content.addAll([
+      SizedBox(height: 20),
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0),
+        child: Text('Energy Consumption Analysis', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      ),
+      // Add energy consumption analysis widgets here
+    ]);
+  }
+
+  return content;
+}
+
+  Widget _buildMobileTable(String? userRole) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      itemCount: filteredAndSortedData.length,
+      itemBuilder: (context, index) => _buildMobileTableRow(filteredAndSortedData[index], userRole),
+    );
+  }
+
+  Widget _buildMobileTableRow(Map<String, dynamic> data, String? userRole) {
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ExpansionTile(
+        title: Text(data['symptom'], style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text('${data['location']} - ${data['status']}'),
+        children: [
+          ListTile(title: Text('Date Opened: ${data['dateOpened']}')),
+          ListTile(title: Text('Ticket ID: ${data['ticketId']}')),
+          if (userRole == 'Energy Expert')
+            ListTile(title: Text('Assigned To: ${data['assignedTo'] ?? 'Unassigned'}')),
+          if (userRole == 'Maintenance Technician')
+            ListTile(title: Text('Assigned By: ${data['assignedBy'] ?? 'Unassigned'}')),
+          ListTile(
+            title: Text('Sub-symptoms:'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: data['subSymptoms'].map<Widget>((subSymptom) {
+                return Text('${subSymptom['name']}: ${subSymptom['percentage']}%');
+              }).toList(),
+            ),
+          ),
+          if (userRole == 'Energy Expert')
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: ElevatedButton(
+                child: Text('Assign Technician'),
+                onPressed: () => _showAssignTechnicianDialog(context, data),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -421,17 +571,14 @@ Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
     );
   }
 
-  Widget _buildCreateNewTaskButton() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: ElevatedButton(
-        child: Text('Create New Task +'),
-        onPressed: () {
-          // Implement create new task functionality
-        },
-      ),
-    );
-  }
+Widget _buildCreateNewTaskButton() {
+  return FloatingActionButton(
+    child: Icon(Icons.add),
+    onPressed: () {
+      // Implement create new task functionality
+    },
+  );
+}
 
 void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
   final userRole = context.read<UserProvider>().userRole;
