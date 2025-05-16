@@ -32,6 +32,11 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // Add this block
+    lintOptions {
+        disable("Instantiatable")
+    }
 }
 
 // Adding dependencies correctly in Kotlin DSL
