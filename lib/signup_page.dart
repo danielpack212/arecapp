@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'main.dart'; // Import the file where MainNavigation is defined
+import 'main.dart';
 
 class SignUpPage extends StatefulWidget {
   @override
@@ -14,8 +14,8 @@ class _SignUpPageState extends State<SignUpPage> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   
-  String? _selectedRole; // To hold the selected value from the dropdown
-  final List<String> _roles = ['Maintenance Technician', 'Energy Expert']; // Dropdown items
+  String? _selectedRole;
+  final List<String> _roles = ['Maintenance Technician', 'Energy Expert'];
 
   bool _obscurePassword = true;
   String error = '';
@@ -27,11 +27,10 @@ class _SignUpPageState extends State<SignUpPage> {
         password: _passwordController.text.trim(),
       );
 
-      // Store additional user information in Firestore
       await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
-        'role': _selectedRole, // Store the selected role
+        'role': _selectedRole,
         'email': _emailController.text.trim(),
       });
 
@@ -49,80 +48,101 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFFAFAFA),
+      backgroundColor: Colors.grey[200],
       appBar: AppBar(
         backgroundColor: Colors.grey[900],
         title: Text('Sign Up', style: TextStyle(color: Colors.white)),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            if (error.isNotEmpty)
-              Text(error, style: TextStyle(color: Colors.red)),
-            SizedBox(height: 20),
-            TextField(
-              controller: _nameController,
-              decoration: _inputDecoration('Name'),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: _phoneController,
-              decoration: _inputDecoration('Phone Number'),
-            ),
-            SizedBox(height: 16),
-            // Dropdown for role selection
-            DropdownButtonFormField<String>(
-              value: _selectedRole,
-              onChanged: (value) {
-                setState(() {
-                  _selectedRole = value;
-                });
-              },
-              decoration: InputDecoration(labelText: 'Select Role'),
-              items: _roles.map((role) {
-                return DropdownMenuItem<String>(
-                  value: role,
-                  child: Text(role),
-                );
-              }).toList(),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: _emailController,
-              decoration: _inputDecoration('Email'),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              decoration: _inputDecoration('Password').copyWith(
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility : Icons.visibility_off,
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Card(
+              elevation: 4,
+              color: Colors.grey[50],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 400),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (error.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: Text(error, style: TextStyle(color: Colors.red)),
+                        ),
+                      TextField(
+                        controller: _nameController,
+                        decoration: _inputDecoration('Name'),
+                      ),
+                      SizedBox(height: 16),
+                      TextField(
+                        controller: _phoneController,
+                        decoration: _inputDecoration('Phone Number'),
+                      ),
+                      SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _selectedRole,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedRole = value;
+                          });
+                        },
+                        decoration: _inputDecoration('Select Role'),
+                        items: _roles.map((role) {
+                          return DropdownMenuItem<String>(
+                            value: role,
+                            child: Text(role),
+                          );
+                        }).toList(),
+                      ),
+                      SizedBox(height: 16),
+                      TextField(
+                        controller: _emailController,
+                        decoration: _inputDecoration('Email'),
+                      ),
+                      SizedBox(height: 16),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        decoration: _inputDecoration('Password').copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                            ),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _signup,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[900],
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                          minimumSize: Size(double.infinity, 50),
+                        ),
+                        child: Text('Sign Up'),
+                      ),
+                      SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pushReplacementNamed(context, '/login');
+                        },
+                        child: Text("Already have an account? Login"),
+                      ),
+                    ],
                   ),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ),
             ),
-            SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: _signup,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[900],
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-              ),
-              child: Text('Sign Up'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, '/login');
-              },
-              child: Text("Already have an account? Login"),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -135,6 +155,7 @@ class _SignUpPageState extends State<SignUpPage> {
       filled: true,
       fillColor: Colors.grey[200],
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
     );
   }
 }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'user_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 class MaintenanceLogPage extends StatefulWidget {
   @override
@@ -151,7 +154,7 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   Widget _buildMobileLayout(String? userRole) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(userRole == 'Maintenance Technician' ? 'Maintenance View' : 'Energy Expert View'),
+        //title: Text(userRole == 'Maintenance Technician' ? 'Maintenance View' : 'Energy Expert View'),
         actions: [
           IconButton(
             icon: Icon(_showMobileFilters ? Icons.filter_list_off : Icons.filter_list),
@@ -414,7 +417,7 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
 
   Widget _buildTableHeader(String? userRole) {
         List<Widget> headerCells = [
-      _buildHeaderCell('Symptom? Detection', flex: 2),
+      _buildHeaderCell('Symptom Detection', flex: 2),
       _buildHeaderCell('Location'),
       _buildHeaderCell('Status'),
       _buildHeaderCell('Date Opened'),
@@ -451,17 +454,12 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      if (userRole == 'Maintenance Technician')
-        Text('Maintenance Technician View', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      if (userRole == 'Energy Expert')
-        Text('Energy Expert View', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      //if (userRole == 'Maintenance Technician')
+        //Text('Maintenance Technician View', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      //if (userRole == 'Energy Expert')
+        ///Text('Energy Expert View', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       SizedBox(height: 10),
       Expanded(child: _buildTable(userRole)),
-      if (userRole == 'Energy Expert') ...[
-        SizedBox(height: 10),
-        Text('Energy Consumption Analysis', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        // Add energy consumption analysis widgets here
-      ],
     ],
   );
 }
@@ -575,9 +573,155 @@ Widget _buildCreateNewTaskButton() {
   return FloatingActionButton(
     child: Icon(Icons.add),
     onPressed: () {
-      // Implement create new task functionality
+      showCreateTaskDialog(context, context.read<UserProvider>().userRole);
     },
   );
+}
+
+void showCreateTaskDialog(BuildContext context, String? userRole) {
+  String classification = '';
+  String building = '';
+  String location = '';
+  String technician = '';
+  String notes = '';
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return FutureBuilder<String>(
+        future: _getTechnicianName(userRole),
+        builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return AlertDialog(
+              title: Text('Error'),
+              content: Text('Failed to load technician data.'),
+              actions: [
+                TextButton(
+                  child: Text('OK'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          } else {
+            technician = snapshot.data ?? '';
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.8,
+                height: MediaQuery.of(context).size.height * 0.9,
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Create New Task',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                    SizedBox(height: 20),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              decoration: InputDecoration(labelText: 'Classification'),
+                              onChanged: (value) => classification = value,
+                            ),
+                            SizedBox(height: 16),
+                            TextField(
+                              decoration: InputDecoration(labelText: 'Building'),
+                              onChanged: (value) => building = value,
+                            ),
+                            SizedBox(height: 16),
+                            TextField(
+                              decoration: InputDecoration(labelText: 'Location'),
+                              onChanged: (value) => location = value,
+                            ),
+                            SizedBox(height: 16),
+                            userRole == 'Maintenance Technician'
+                              ? TextField(
+                                  decoration: InputDecoration(labelText: 'Technician'),
+                                  enabled: false,
+                                  controller: TextEditingController(text: technician),
+                                )
+                              : DropdownButtonFormField<String>(
+                                  decoration: InputDecoration(labelText: 'Technician'),
+                                  value: technician.isEmpty ? null : technician,
+                                  onChanged: (value) => technician = value!,
+                                  items: <String>['Technician 1', 'Technician 2', 'Technician 3']
+                                    .map<DropdownMenuItem<String>>((String value) {
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(value),
+                                      );
+                                    }).toList(),
+                                ),
+                            SizedBox(height: 16),
+                            TextField(
+                              decoration: InputDecoration(labelText: 'Notes'),
+                              maxLines: 5,
+                              onChanged: (value) => notes = value,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          child: Text('Cancel', style: TextStyle(color: Colors.red)),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        SizedBox(width: 16),
+                        ElevatedButton(
+                          child: Text('Submit Maintenance Request'),
+                          onPressed: () {
+                            // Here you would typically send the data to your backend
+                            print('Classification: $classification');
+                            print('Building: $building');
+                            print('Location: $location');
+                            print('Technician: $technician');
+                            print('Notes: $notes');
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        },
+      );
+    },
+  );
+}
+
+Future<String> _getTechnicianName(String? userRole) async {
+  if (userRole == 'Maintenance Technician') {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        return userData['name'] ?? '';
+      }
+    }
+  }
+  return '';
 }
 
 void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
