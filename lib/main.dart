@@ -101,7 +101,7 @@ class AuthGate extends StatelessWidget {
         } else if (snapshot.hasData) {
           return MainNavigation();
         } else {
-          return kIsWeb ? LandingPage() : LoginPage();
+          return LoginPage();
         }
       },
     );
