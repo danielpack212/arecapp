@@ -100,28 +100,98 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   },
   ];
 
-  List<Map<String, dynamic>> get filteredAndSortedData {
-    return dummyData.where((item) {
-      return (selectedClassification == 'All' || item['classification'] == selectedClassification) &&
-          (selectedStatus == 'All' || item['status'] == selectedStatus) &&
-          (selectedLocation == 'All' || item['location'] == selectedLocation) &&
-          (searchQuery.isEmpty ||
-              item['symptom'].toLowerCase().contains(searchQuery.toLowerCase()) ||
-              item['ticketId'].toLowerCase().contains(searchQuery.toLowerCase()));
-    }).toList()
-      ..sort((a, b) {
-        if (sortBy == 'Date Opened') {
-          return sortAscending
-              ? a['dateOpened'].compareTo(b['dateOpened'])
-              : b['dateOpened'].compareTo(a['dateOpened']);
-        } else if (sortBy == 'Status') {
-          return sortAscending
-              ? a['status'].compareTo(b['status'])
-              : b['status'].compareTo(a['status']);
-        }
-        return 0;
-      });
+ //initialize tasks in firebase
+ @override
+void initState() {
+  super.initState();
+  initializeFirestoreWithDummyData();
+}
+
+ Future<bool> tasksExistInFirestore() async {
+  QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('tasks').limit(1).get();
+  return snapshot.docs.isNotEmpty;
+}
+
+Future<void> initializeFirestoreWithDummyData() async {
+  bool tasksExist = await tasksExistInFirestore();
+  if (!tasksExist) {
+    for (var task in dummyData) {
+      await addTaskToFirebase(task);
+    }
+    print('Dummy data added to Firestore');
+  } else {
+    print('Tasks already exist in Firestore');
   }
+}
+
+
+Future<void> addTaskToFirebase(Map<String, dynamic> taskData) async {
+  // Remove the 'isExpanded' field as it's not needed in Firestore
+  taskData.remove('isExpanded');
+  await FirebaseFirestore.instance.collection('tasks').add(taskData);
+}
+
+
+// NEW filtering and sorting
+
+  Query getFilteredAndSortedQuery() {
+  Query query = FirebaseFirestore.instance.collection('tasks');
+
+  // Apply filters
+  if (selectedClassification != 'All') {
+    query = query.where('classification', isEqualTo: selectedClassification);
+  }
+  if (selectedStatus != 'All') {
+    query = query.where('status', isEqualTo: selectedStatus);
+  }
+  if (selectedLocation != 'All') {
+    query = query.where('location', isEqualTo: selectedLocation);
+  }
+
+  // Apply sorting
+  if (sortBy == 'Date Opened') {
+    query = query.orderBy('dateOpened', descending: !sortAscending);
+  } else if (sortBy == 'Status') {
+    query = query.orderBy('status', descending: !sortAscending);
+  }
+
+  return query;
+}
+
+// new methods
+void updateFilter(String filterType, String value) {
+  setState(() {
+    switch (filterType) {
+      case 'classification':
+        selectedClassification = value;
+        break;
+      case 'status':
+        selectedStatus = value;
+        break;
+      case 'location':
+        selectedLocation = value;
+        break;
+    }
+  });
+}
+
+void updateSort(String newSortBy) {
+  setState(() {
+    if (sortBy == newSortBy) {
+      sortAscending = !sortAscending;
+    } else {
+      sortBy = newSortBy;
+      sortAscending = true;
+    }
+  });
+}
+
+void updateSearch(String query) {
+  setState(() {
+    searchQuery = query;
+  });
+}
+
   bool _showMobileFilters = false;
   @override
   Widget build(BuildContext context) {
@@ -146,7 +216,7 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
           Expanded(
             child: _buildRoleBasedContent(userRole),
           ),
-          _buildCreateNewTaskButton(),
+          _buildCreateNewTaskButton(context),
         ],
       ),
     );
@@ -184,7 +254,7 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
           ],
         ),
       ),
-      floatingActionButton: _buildCreateNewTaskButton(),
+      floatingActionButton: _buildCreateNewTaskButton(context),
     );
   }
 
@@ -235,32 +305,87 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   }
 
 List<Widget> _buildMobileRoleBasedContent(String? userRole) {
-  List<Widget> content = [
-    ...filteredAndSortedData.map((data) => _buildMobileTableRow(data, userRole)).toList(),
-  ];
-
-  if (userRole == 'Energy Expert') {
-    content.addAll([
+  return [
+    StreamBuilder<QuerySnapshot>(
+      stream: getFilteredAndSortedQuery().snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(child: Text('No tasks available'));
+        }
+        
+        List<Map<String, dynamic>> tasks = snapshot.data!.docs
+            .map((doc) {
+              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+              data['id'] = doc.id;
+              return data;
+            })
+            .where((task) =>
+              searchQuery.isEmpty ||
+              task['symptom'].toLowerCase().contains(searchQuery.toLowerCase()) ||
+              task['ticketId'].toLowerCase().contains(searchQuery.toLowerCase()))
+            .toList();
+        
+        if (userRole == 'Maintenance Technician') {
+          String currentUserUid = FirebaseAuth.instance.currentUser!.uid;
+          tasks = tasks.where((task) => task['assignedTo'] == currentUserUid).toList();
+        }
+        
+        return Column(
+          children: tasks.map((data) => _buildMobileTableRow(data, userRole)).toList(),
+        );
+      },
+    ),
+    if (userRole == 'Energy Expert') ...[
       SizedBox(height: 20),
       Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.0),
         child: Text('Energy Consumption Analysis', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
       // Add energy consumption analysis widgets here
-    ]);
-  }
-
-  return content;
+    ],
+  ];
 }
 
-  Widget _buildMobileTable(String? userRole) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      itemCount: filteredAndSortedData.length,
-      itemBuilder: (context, index) => _buildMobileTableRow(filteredAndSortedData[index], userRole),
-    );
-  }
+ Widget _buildMobileTable(String? userRole) {
+  return StreamBuilder<QuerySnapshot>(
+    stream: getFilteredAndSortedQuery().snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return Center(child: CircularProgressIndicator());
+      }
+      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        return Center(child: Text('No tasks available'));
+      }
+      
+      List<Map<String, dynamic>> tasks = snapshot.data!.docs
+          .map((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            data['id'] = doc.id;
+            return data;
+          })
+          .where((task) =>
+            searchQuery.isEmpty ||
+            task['symptom'].toLowerCase().contains(searchQuery.toLowerCase()) ||
+            task['ticketId'].toLowerCase().contains(searchQuery.toLowerCase()))
+          .toList();
+      
+      if (userRole == 'Maintenance Technician') {
+        String currentUserUid = FirebaseAuth.instance.currentUser!.uid;
+        tasks = tasks.where((task) => task['assignedTo'] == currentUserUid).toList();
+      }
+      
+      return ListView.builder(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        itemCount: tasks.length,
+        itemBuilder: (context, index) => _buildMobileTableRow(tasks[index], userRole),
+      );
+    },
+  );
+}
 
   Widget _buildMobileTableRow(Map<String, dynamic> data, String? userRole) {
     return Card(
@@ -325,95 +450,86 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
       ],
     );
   }
-
-  Widget _buildFilterButton(String label, List<String> items, String value, void Function(String?) onChanged) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: PopupMenuButton<String>(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(value == 'All' ? label : value),
-              SizedBox(width: 8),
-              Icon(Icons.arrow_drop_down),
-            ],
-          ),
+Widget _buildFilterButton(String label, List<String> items, String value, void Function(String?) onChanged) {
+  return Container(
+    decoration: BoxDecoration(
+      border: Border.all(color: Colors.grey[300]!),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: PopupMenuButton<String>(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(value == 'All' ? label : value),
+            SizedBox(width: 8),
+            Icon(Icons.arrow_drop_down),
+          ],
         ),
-        onSelected: onChanged,
-        itemBuilder: (BuildContext context) {
-          return items.map<PopupMenuItem<String>>((String item) {
-            return PopupMenuItem<String>(
-              value: item,
-              child: Text(item),
-            );
-          }).toList();
-        },
       ),
-    );
-  }
-
-  Widget _buildSortByButton() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: PopupMenuButton<String>(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Sort By: $sortBy'),
-              SizedBox(width: 8),
-              Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
-            ],
-          ),
-        ),
-        onSelected: (String? newValue) {
-          setState(() {
-            if (sortBy == newValue) {
-              sortAscending = !sortAscending;
-            } else {
-              sortBy = newValue!;
-              sortAscending = true;
-            }
-          });
-        },
-        itemBuilder: (BuildContext context) {
-          return <String>['Date Opened', 'Status'].map<PopupMenuItem<String>>((String value) {
-            return PopupMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList();
-        },
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: 'Search...',
-        suffixIcon: Icon(Icons.search),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-      ),
-      onChanged: (value) {
-        setState(() {
-          searchQuery = value;
-        });
+      onSelected: (String newValue) {
+        onChanged(newValue);
+        updateFilter(label.toLowerCase(), newValue);
       },
-    );
-  }
+      itemBuilder: (BuildContext context) {
+        return items.map<PopupMenuItem<String>>((String item) {
+          return PopupMenuItem<String>(
+            value: item,
+            child: Text(item),
+          );
+        }).toList();
+      },
+    ),
+  );
+}
+Widget _buildSortByButton() {
+  return Container(
+    decoration: BoxDecoration(
+      border: Border.all(color: Colors.grey[300]!),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: PopupMenuButton<String>(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Sort By: $sortBy'),
+            SizedBox(width: 8),
+            Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
+          ],
+        ),
+      ),
+      onSelected: (String newValue) {
+        updateSort(newValue);
+      },
+      itemBuilder: (BuildContext context) {
+        return <String>['Date Opened', 'Status'].map<PopupMenuItem<String>>((String value) {
+          return PopupMenuItem<String>(
+            value: value,
+            child: Text(value),
+          );
+        }).toList();
+      },
+    ),
+  );
+}
+Widget _buildSearchBar() {
+  return TextField(
+    decoration: InputDecoration(
+      hintText: 'Search...',
+      suffixIcon: Icon(Icons.search),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+    ),
+    onChanged: (value) {
+      updateSearch(value);
+    },
+  );
+}
 
   Widget _buildTableHeader(String? userRole) {
         List<Widget> headerCells = [
@@ -450,60 +566,96 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
       ),
     );
   }
-  Widget _buildRoleBasedContent(String? userRole) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      //if (userRole == 'Maintenance Technician')
-        //Text('Maintenance Technician View', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      //if (userRole == 'Energy Expert')
-        ///Text('Energy Expert View', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      SizedBox(height: 10),
-      Expanded(child: _buildTable(userRole)),
-    ],
+Widget _buildRoleBasedContent(String? userRole) {
+  return StreamBuilder<QuerySnapshot>(
+    stream: getFilteredAndSortedQuery().snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return Center(child: CircularProgressIndicator());
+      }
+      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        return Center(child: Text('No tasks available'));
+      }
+      
+      List<Map<String, dynamic>> tasks = snapshot.data!.docs
+          .map((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            data['id'] = doc.id;
+            return data;
+          })
+          .where((task) =>
+            searchQuery.isEmpty ||
+            task['symptom'].toLowerCase().contains(searchQuery.toLowerCase()) ||
+            task['ticketId'].toLowerCase().contains(searchQuery.toLowerCase()))
+          .toList();
+      
+      if (userRole == 'Maintenance Technician') {
+        String currentUserUid = FirebaseAuth.instance.currentUser!.uid;
+        tasks = tasks.where((task) => task['assignedTo'] == currentUserUid).toList();
+      }
+      
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 10),
+          Expanded(child: _buildTable(userRole, tasks)),
+        ],
+      );
+    },
   );
 }
-  Widget _buildTable(String? userRole) {
-    return ListView.builder(
-      itemCount: filteredAndSortedData.length,
-      itemBuilder: (context, index) => _buildExpandableTableRow(filteredAndSortedData[index], userRole),
-    );
-  }
 
-  Widget _buildExpandableTableRow(Map<String, dynamic> data, String? userRole) {
-        List<Widget> rowCells = [
-      _buildRowCell(
-        Row(
-          children: [
-            Icon(data['isExpanded'] ? Icons.arrow_drop_down : Icons.arrow_right),
-            Expanded(child: Text(data['symptom'], style: TextStyle(fontWeight: FontWeight.bold))),
-          ],
+Widget _buildTable(String? userRole, List<Map<String, dynamic>> tasks) {
+  return ListView.builder(
+    itemCount: tasks.length,
+    itemBuilder: (context, index) => _buildExpandableTableRow(tasks[index], userRole),
+  );
+}
+Widget _buildExpandableTableRow(Map<String, dynamic> data, String? userRole) {
+  return StatefulBuilder(
+    builder: (BuildContext context, StateSetter setStateRow) {
+      List<Widget> rowCells = [
+        _buildRowCell(
+          Row(
+            children: [
+              Icon(data['isExpanded'] == true ? Icons.arrow_drop_down : Icons.arrow_right),
+              Expanded(child: Text(data['symptom'] ?? '', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          ),
+          flex: 2,
         ),
-        flex: 2,
-      ),
-      _buildRowCell(Text(data['location'])),
-      _buildRowCell(Text(data['status'])),
-      _buildRowCell(Text(data['dateOpened'])),
-      _buildRowCell(Text(data['ticketId'])),
-    ];
+        _buildRowCell(Text(data['location'] ?? '')),
+        _buildRowCell(Text(data['status'] ?? '')),
+        _buildRowCell(Text(data['dateOpened'] ?? '')),
+        _buildRowCell(Text(data['ticketId'] ?? '')),
+      ];
 
-    if (userRole == 'Energy Expert') {
-      rowCells.insert(3, _buildRowCell(Text(data['assignedTo'] ?? 'Unassigned')));
-    } else if (userRole == 'Maintenance Technician') {
-      rowCells.insert(3, _buildRowCell(Text(data['assignedBy'] ?? 'Unassigned')));
-    }
+      if (userRole == 'Energy Expert') {
+        rowCells.insert(3, _buildRowCell(Text(data['assignedToName'] ?? 'Unassigned')));
+      } else if (userRole == 'Maintenance Technician') {
+        rowCells.insert(3, _buildRowCell(
+          FutureBuilder<String>(
+            future: _getAssignedByName(data['assignedBy']),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return CircularProgressIndicator();
+              }
+              return Text(snapshot.data ?? 'Unknown');
+            },
+          )
+        ));
+      }
 
-    return Column(
-      children: [
-        GestureDetector(
-          onDoubleTap: () {
-            _showDetailPopup(context, data);
-          },
-          child: InkWell(
+      return Column(
+        children: [
+          GestureDetector(
             onTap: () {
-              setState(() {
-                data['isExpanded'] = !data['isExpanded'];
+              setStateRow(() {
+                data['isExpanded'] = !(data['isExpanded'] == true);
               });
+            },
+            onDoubleTap: () {
+              _showDetailPopup(context, data);
             },
             child: Container(
               decoration: BoxDecoration(
@@ -511,15 +663,23 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
                   bottom: BorderSide(color: Colors.grey[300]!),
                 ),
               ),
-              child: Row( children: rowCells),
-              ),
+              child: Row(children: rowCells),
             ),
           ),
-        if (data['isExpanded'])
-        _buildExpandedContent(data, userRole),
-      ],
-    );
-  }
+          if (data['isExpanded'] == true)
+            _buildExpandedContent(data, userRole),
+        ],
+      );
+    },
+  );
+}
+
+Future<String> _getAssignedByName(String? uid) async {
+  if (uid == null) return 'Unknown';
+  DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+  return doc.get('name') as String? ?? 'Unknown';
+}
+
 Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
   return Container(
     padding: EdgeInsets.all(8),
@@ -545,11 +705,28 @@ Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(userRole == 'Energy Expert' ? 'Assigned To:' : 'Assigned By:', 
+              Text(userRole == 'Energy Expert' ? 'Available Technicians:' : 'Assigned By:', 
                    style: TextStyle(fontWeight: FontWeight.bold)),
-              Text(userRole == 'Energy Expert' 
-                   ? (data['assignedTo'] ?? 'Unassigned')
-                   : (data['assignedBy'] ?? 'Unassigned')),
+              if (userRole == 'Energy Expert')
+                FutureBuilder<List<String>>(
+                  future: _fetchTechniciansForBuilding(data['location']),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return CircularProgressIndicator();
+                    } else if (snapshot.hasError) {
+                      return Text('Error: ${snapshot.error}');
+                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return Text('No technicians available');
+                    } else {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: snapshot.data!.map((tech) => Text(tech)).toList(),
+                      );
+                    }
+                  },
+                )
+              else
+                Text(data['assignedBy'] ?? 'Unassigned'),
             ],
           ),
         ),
@@ -559,6 +736,7 @@ Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
     ),
   );
 }
+
   Widget _buildRowCell(Widget child, {int flex = 1}) {
     return Expanded(
       flex: flex,
@@ -569,7 +747,7 @@ Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
     );
   }
 
-Widget _buildCreateNewTaskButton() {
+Widget _buildCreateNewTaskButton(BuildContext context) {
   return FloatingActionButton(
     child: Icon(Icons.add),
     onPressed: () {
@@ -849,74 +1027,135 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
     );
   }
 
-  void _showAssignTechnicianDialog(BuildContext context, Map<String, dynamic> data) {
-    List<String> technicians = List<String>.from(data['technicianOptions'] ?? []);
-    if (!technicians.contains('Any Available')) {
-      technicians.add('Any Available');
+    Future<List<String>> _fetchTechniciansForBuilding(String building) async {
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('role', isEqualTo: 'Maintenance Technician')
+        .where('building', isEqualTo: building)
+        .get();
+    return snapshot.docs.map((doc) => doc.get('name') as String).toList();
     }
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Assign Technician'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: technicians.map((String technician) {
-                return ListTile(
-                  title: Text(technician),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _showConfirmationDialog(context, data, technician);
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-        );
-      },
-    );
-  }
 
-  void _showConfirmationDialog(BuildContext context, Map<String, dynamic> data, String selectedTechnician) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Confirm Technician Assignment'),
-          content: Text('Are you sure you want to assign $selectedTechnician to this task?'),
-          actions: <Widget>[
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('Confirm'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _assignTechnician(data, selectedTechnician);
-              },
-            ),
-          ],
-        );
-      },
+ void _showAssignTechnicianDialog(BuildContext context, Map<String, dynamic> data) async {
+  List<String> technicians = await _fetchTechniciansForBuilding(data['location']);
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Assign Technician'),
+        content: SingleChildScrollView(
+          child: ListBody(
+            children: [
+              ListTile(
+                title: Text('Unassign'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showConfirmationDialog(context, data, null);
+                },
+              ),
+              ...technicians.isEmpty
+                  ? [ListTile(title: Text('No available technicians'))]
+                  : technicians.map((String technician) {
+                      return ListTile(
+                        title: Text(technician),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _showConfirmationDialog(context, data, technician);
+                        },
+                      );
+                    }).toList(),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            child: Text('Close'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      );
+    },
+  );
+}
+void _showConfirmationDialog(BuildContext context, Map<String, dynamic> data, String? selectedTechnician) {
+  String message = selectedTechnician == null
+      ? 'Are you sure you want to unassign this task?'
+      : 'Are you sure you want to assign $selectedTechnician to this task?';
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text(selectedTechnician == null ? 'Confirm Unassignment' : 'Confirm Technician Assignment'),
+        content: Text(message),
+        actions: <Widget>[
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+          TextButton(
+            child: Text('Confirm'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _assignTechnician(data, selectedTechnician);
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+void _assignTechnician(Map<String, dynamic> data, String? selectedTechnician) async {
+  try {
+    Map<String, dynamic> updateData;
+
+    if (selectedTechnician == null) {
+      // Unassign the task
+      updateData = {
+        'status': 'Action Required',
+        'assignedTo': null,
+        'assignedToName': null,
+        'assignedBy': null,
+      };
+    } else {
+      // Assign the task to the selected technician
+      QuerySnapshot technicianSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('name', isEqualTo: selectedTechnician)
+          .limit(1)
+          .get();
+
+      if (technicianSnapshot.docs.isEmpty) {
+        throw Exception('Technician not found');
+      }
+
+      String technicianUid = technicianSnapshot.docs.first.id;
+
+      updateData = {
+        'status': 'Assigned',
+        'assignedTo': technicianUid,
+        'assignedToName': selectedTechnician,
+        'assignedBy': FirebaseAuth.instance.currentUser!.uid,
+      };
+    }
+
+    // Update the existing task in Firestore
+    await FirebaseFirestore.instance.collection('tasks').doc(data['id']).update(updateData);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(selectedTechnician == null ? 'Task unassigned' : 'Task assigned to $selectedTechnician')),
     );
-  }
-    void _assignTechnician(Map<String, dynamic> data, String selectedTechnician) {
-    // Here you would update the data and send it to the database
-    // For now, we'll just print the assignment
-    print('Assigning $selectedTechnician to task ${data['ticketId']}');
-    
-    // TODO: Implement database update
-    // Example of how you might update the data:
-    // data['technician'] = selectedTechnician;
-    // DatabaseService().updateMaintenanceTask(data['ticketId'], data);
-    
-    // For now, let's update the state to reflect the change
-    setState(() {
-      data['technician'] = selectedTechnician;
-    });
+  } catch (e) {
+    print('Error assigning/unassigning technician: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to assign/unassign technician')),
+    );
   }
 }
+}
+
+

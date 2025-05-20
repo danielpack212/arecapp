@@ -15,7 +15,9 @@ class _SignUpPageState extends State<SignUpPage> {
   final _phoneController = TextEditingController();
   
   String? _selectedRole;
+  String? _selectedBuilding;
   final List<String> _roles = ['Maintenance Technician', 'Energy Expert'];
+  final List<String> _buildings = ['Hofburg', 'TUWien', 'The Loft'];
 
   bool _obscurePassword = true;
   String error = '';
@@ -27,12 +29,18 @@ class _SignUpPageState extends State<SignUpPage> {
         password: _passwordController.text.trim(),
       );
 
-      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+      Map<String, dynamic> userData = {
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
         'role': _selectedRole,
         'email': _emailController.text.trim(),
-      });
+      };
+
+      if (_selectedRole == 'Maintenance Technician') {
+        userData['building'] = _selectedBuilding;
+      }
+
+      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set(userData);
 
       Navigator.pushReplacement(
         context,
@@ -91,6 +99,9 @@ class _SignUpPageState extends State<SignUpPage> {
                         onChanged: (value) {
                           setState(() {
                             _selectedRole = value;
+                            if (value != 'Maintenance Technician') {
+                              _selectedBuilding = null;
+                            }
                           });
                         },
                         decoration: _inputDecoration('Select Role'),
@@ -102,6 +113,24 @@ class _SignUpPageState extends State<SignUpPage> {
                         }).toList(),
                       ),
                       SizedBox(height: 16),
+                      if (_selectedRole == 'Maintenance Technician')
+                        DropdownButtonFormField<String>(
+                          value: _selectedBuilding,
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedBuilding = value;
+                            });
+                          },
+                          decoration: _inputDecoration('Select Building'),
+                          items: _buildings.map((building) {
+                            return DropdownMenuItem<String>(
+                              value: building,
+                              child: Text(building),
+                            );
+                          }).toList(),
+                        ),
+                      if (_selectedRole == 'Maintenance Technician')
+                        SizedBox(height: 16),
                       TextField(
                         controller: _emailController,
                         decoration: _inputDecoration('Email'),
