@@ -5,9 +5,15 @@ import 'user_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+
+import 'notification_service.dart';
 import 'chat_provider.dart'; // Make sure you've created this file
 
 class MaintenanceLogPage extends StatefulWidget {
+  final NotificationService notificationService;
+
+  MaintenanceLogPage({Key? key, required this.notificationService}) : super(key: key);
+
   @override
   _MaintenanceLogPageState createState() => _MaintenanceLogPageState();
 }
@@ -111,20 +117,23 @@ void listenForNewTasks() {
       if (change.type == DocumentChangeType.added) {
         var newTask = change.doc.data() as Map<String, dynamic>;
         String ticketId = newTask['ticketId'];
-        
+        String symptom = newTask['symptom']; // 👈 make sure 'symptom' exists in your Firestore data
+
         // Check if a chat for this ticket already exists
         if (!Provider.of<ChatProvider>(context, listen: false).chatExists(ticketId)) {
-          createNewChatTab(ticketId);
+          createNewChatTab(ticketId, symptom); // 👈 now passes both
         }
       }
     }
   });
 }
 
+late final NotificationService _notificationService;
  //initialize tasks in firebase
  @override
 void initState() {
   super.initState();
+  _notificationService = widget.notificationService;
   initializeFirestoreWithDummyData();
   listenForNewTasks();
 }
@@ -173,11 +182,10 @@ Query getFilteredAndSortedQuery() {
 }
 
 // create new chat
-void createNewChatTab(String ticketId) {
-  // You'll need to implement a way to communicate between pages
-  // One way is to use a global state management solution like Provider
-  Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId);
+void createNewChatTab(String ticketId, String symptom) {
+  Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId, symptom);
 }
+
 
 // close chat 
 void checkAndRemoveResolvedChats(List<Map<String, dynamic>> tasks) {
@@ -1053,7 +1061,7 @@ void _createNewTask(String symptom, String classification, String location, Stri
     });
 
     // Create a new chat for this task
-    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId);
+    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,symptom);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('New task created successfully')),
@@ -1346,6 +1354,7 @@ void _showConfirmationDialog(BuildContext context, Map<String, dynamic> data, St
     },
   );
 }
+
 void _assignTechnician(Map<String, dynamic> data, String? selectedTechnician) async {
   try {
     Map<String, dynamic> updateData;
@@ -1378,6 +1387,17 @@ void _assignTechnician(Map<String, dynamic> data, String? selectedTechnician) as
         'assignedToName': selectedTechnician,
         'assignedBy': FirebaseAuth.instance.currentUser!.uid,
       };
+
+  // Send notification to the assigned technician using the external server
+      await widget.notificationService.sendNotificationToUser(
+        technicianUid,
+        'New Task Assignment',
+        'You have been assigned to a new task: ${data['symptom']}',
+        {
+          'type': 'chat',
+          'ticketId': data['ticketId'],
+        },
+      );
     }
 
     // Update the existing task in Firestore

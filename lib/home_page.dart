@@ -10,6 +10,8 @@ import 'package:provider/provider.dart';
 const String BASE_URL = 'http://192.168.204.45:5000/'; // Replace with your new IP address
 
 class ChatbotPage extends StatefulWidget {
+  final String? ticketId;
+  ChatbotPage({this.ticketId});
   @override
   _ChatbotPageState createState() => _ChatbotPageState();
 }
@@ -41,7 +43,25 @@ class _ChatbotPageState extends State<ChatbotPage> {
   void initState() {
     super.initState();
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        if (widget.ticketId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openSpecificChat(widget.ticketId!);
+      });
+    }
   }
+
+  void _openSpecificChat(String ticketId) {
+  int index = _chatProvider.chats.indexWhere((chat) => chat['ticketId'] == ticketId);
+  if (index != -1) {
+    setState(() {
+      selectedConversationIndex = index;
+    });
+    print('Opened chat for ticket: $ticketId');
+  } else {
+    print('No chat found for ticket: $ticketId');
+    // Optionally, you could create a new chat here or show an error message
+  }
+}
 
     void _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
@@ -61,7 +81,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
         },
         body: jsonEncode(<String, String>{
           'text': message,
-          'ticketId': _chatProvider.chatTitles[selectedConversationIndex].split('#').last,
+          'ticketId': _chatProvider.chats[selectedConversationIndex]['ticketId'] ?? '',
         }),
       );
 
@@ -157,16 +177,20 @@ class _ChatbotPageState extends State<ChatbotPage> {
     );
   }
 
-  Widget _buildChatList() {
-    return ListView.builder(
-      controller: _scrollController,
-      padding: EdgeInsets.all(8),
-      itemCount: _chatProvider.conversations[selectedConversationIndex].length,
-      itemBuilder: (context, index) {
-        return _buildMessage(_chatProvider.conversations[selectedConversationIndex][index]);
-      },
-    );
+Widget _buildChatList() {
+  if (_chatProvider.conversations.isEmpty || selectedConversationIndex >= _chatProvider.conversations.length) {
+    return Center(child: Text("No conversations available.", style: TextStyle(color: Colors.black)));
   }
+
+  return ListView.builder(
+    controller: _scrollController,
+    padding: EdgeInsets.all(8),
+    itemCount: _chatProvider.conversations[selectedConversationIndex].length,
+    itemBuilder: (context, index) {
+      return _buildMessage(_chatProvider.conversations[selectedConversationIndex][index]);
+    },
+  );
+}
 
   Widget _buildInputArea() {
     return Container(

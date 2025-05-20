@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'firebase_options.dart';
 import 'home_page.dart';
 import 'maintenance_log_page.dart';
 import 'profile_page.dart';
@@ -15,20 +11,17 @@ import 'landing_page.dart';
 import 'package:provider/provider.dart';
 import 'user_provider.dart';
 import 'chat_provider.dart'; 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
 
 
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  print('Handling a background message: ${message.messageId}');
-}
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -38,13 +31,15 @@ Future<void> main() async {
     return;
   }
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
   await _setupFlutterNotifications();
+
+  final notificationService = NotificationService();
+  await notificationService.initializeLocalNotifications();
 
     runApp(
     MultiProvider(
       providers: [
+        Provider<NotificationService>.value(value: notificationService),
         ChangeNotifierProvider(create: (context) => UserProvider()),
         ChangeNotifierProvider(create: (context) => ChatProvider()),
       ],
@@ -54,24 +49,26 @@ Future<void> main() async {
 }
 
 Future<void> _setupFlutterNotifications() async {
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
+  if (!kIsWeb) {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-  );
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+    );
 
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'high_importance_channel',
-    'High Importance Notifications',
-    importance: Importance.high,
-  );
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'high_importance_channel',
+      'High Importance Notifications',
+      importance: Importance.high,
+    );
 
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -89,6 +86,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginPage(),
         '/signup': (context) => SignUpPage(),
         '/landing': (context) => LandingPage(),
+        '/chat': (context) => ChatbotPage(),
       },
     );
   }
@@ -118,60 +116,63 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  final NotificationService _notificationService = NotificationService();
+  late final NotificationService _notificationService;
   int _selectedIndex = 1;
 
-  final List<Widget> _pages = [
-    MaintenanceLogPage(),
-    ChatbotPage(),
-    ProfilePage(),
-  ];
+  late List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+     _notificationService = Provider.of<NotificationService>(context, listen: false);
     _initNotifications();
     _fetchUserRole();
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initPages();
+  }
+    
+  void _initPages() {
+    _pages = [
+      MaintenanceLogPage(notificationService: _notificationService),
+      ChatbotPage(),
+      ProfilePage(),
+    ];
+  }
+  
     Future<void> _fetchUserRole() async {
     await Provider.of<UserProvider>(context, listen: false).fetchUserRole();
   }
 
-  Future<void> _initNotifications() async {
-    final authStatus = await _notificationService.requestNotificationPermissions();
-    if (authStatus == AuthorizationStatus.authorized || authStatus == AuthorizationStatus.provisional) {
-      final token = await _notificationService.getFCMToken();
-      print("FCM Token: $token");
-      if (token != null) {
-        final success = await _notificationService.sendTokenToServer(token);
+
+
+ Future<void> _initNotifications() async {
+  final permissionGranted = await _notificationService.requestNotificationPermissions();
+  if (permissionGranted) {
+    final token = await _notificationService.getDeviceToken();
+    print("Device Token: $token");
+    if (token != null) {
+      final success = await _notificationService.sendTokenToServer(token);
+      if (success) {
+        print("Device token registered successfully");
+      } else {
+        print("Failed to register device token");
       }
     }
-
-    FirebaseMessaging.onMessage.listen((message) {
-      if (message.notification != null) {
-        final notification = message.notification!;
-        final android = message.notification?.android;
-        if (android != null) {
-          flutterLocalNotificationsPlugin.show(
-            notification.hashCode,
-            notification.title,
-            notification.body,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                'high_importance_channel',
-                'High Importance Notifications',
-                importance: Importance.high,
-                priority: Priority.high,
-                showWhen: true,
-              ),
-            ),
-          );
-        } else {
-          _showNotificationDialog(notification.title ?? 'No Title', notification.body ?? 'No Body');
-        }
-      }
-    });
+  } else {
+    print("Notification permissions not granted");
   }
+}
+void _handleIncomingNotification(String title, String body) {
+  if (kIsWeb) {
+    _showNotificationDialog(title, body);
+  } else {
+    _notificationService.showLocalNotification(title, body);
+  }
+}
 
   void _showNotificationDialog(String title, String body) {
     showDialog(
@@ -213,6 +214,13 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+      return StreamBuilder<Map<String, dynamic>>(
+    stream: _notificationService.onNotification,
+    builder: (context, snapshot) {
+      if (snapshot.hasData) {
+        _handleIncomingNotification(snapshot.data!['title'], snapshot.data!['body']);
+      }
+      
     if (kIsWeb) {
       // Web version with top navigation bar
       return Scaffold(
@@ -271,5 +279,7 @@ class _MainNavigationState extends State<MainNavigation> {
         ),
       );
     }
+    }
+      );
   }
 }
