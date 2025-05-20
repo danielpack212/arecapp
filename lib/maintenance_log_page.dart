@@ -6,6 +6,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'chat_provider.dart'; // Make sure you've created this file
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'notification_service.dart';
 
 class MaintenanceLogPage extends StatefulWidget {
   @override
@@ -127,6 +130,7 @@ void initState() {
   super.initState();
   initializeFirestoreWithDummyData();
   listenForNewTasks();
+  WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
 }
 
  Future<bool> tasksExistInFirestore() async {
@@ -1346,7 +1350,7 @@ void _showConfirmationDialog(BuildContext context, Map<String, dynamic> data, St
     },
   );
 }
-void _assignTechnician(Map<String, dynamic> data, String? selectedTechnician) async {
+Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechnician) async {
   try {
     Map<String, dynamic> updateData;
 
@@ -1378,19 +1382,49 @@ void _assignTechnician(Map<String, dynamic> data, String? selectedTechnician) as
         'assignedToName': selectedTechnician,
         'assignedBy': FirebaseAuth.instance.currentUser!.uid,
       };
+
+      // Use NotificationService to send the notification
+      final notificationService = Provider.of<NotificationService>(context, listen: false);
+      bool notificationSent = await notificationService.sendTaskAssignmentNotification(
+        technicianUid,
+        data['ticketId'],
+        data['symptom'],
+      );
+
+      if (!notificationSent) {
+        print('Failed to send task assignment notification');
+      }
     }
 
     // Update the existing task in Firestore
     await FirebaseFirestore.instance.collection('tasks').doc(data['id']).update(updateData);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(selectedTechnician == null ? 'Task unassigned' : 'Task assigned to $selectedTechnician')),
-    );
+    // Use a callback to update the UI after the async operation is complete
+    if (mounted) {
+      setState(() {
+        // Update your local state here if necessary
+      });
+    }
+
+    // Show a snackbar outside of setState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(selectedTechnician == null ? 'Task unassigned' : 'Task assigned to $selectedTechnician')),
+        );
+      }
+    });
+
   } catch (e) {
     print('Error assigning/unassigning technician: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to assign/unassign technician')),
-    );
+    // Show error message outside of setState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to assign/unassign technician')),
+        );
+      }
+    });
   }
 }
 }

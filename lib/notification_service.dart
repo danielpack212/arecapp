@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class NotificationService {
   FirebaseMessaging messaging = FirebaseMessaging.instance;
@@ -11,6 +14,8 @@ class NotificationService {
   Stream<RemoteMessage> get onMessage => FirebaseMessaging.onMessage;
 
   Future<void> initializeLocalNotifications() async {
+    if (kIsWeb) return; // Skip for web
+
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -20,7 +25,7 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(settings);
 
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'high_importance_channel', // Must match server.js
+      'high_importance_channel',
       'High Importance Notifications',
       description: 'Used for important notifications',
       importance: Importance.high,
@@ -33,15 +38,20 @@ class NotificationService {
   }
 
   Future<AuthorizationStatus> requestNotificationPermissions() async {
+    if (kIsWeb) return AuthorizationStatus.authorized; // Skip for web
+
     NotificationSettings settings = await messaging.requestPermission();
     return settings.authorizationStatus;
   }
 
   Future<String?> getFCMToken() async {
+    if (kIsWeb) return null; // Skip for web
     return await messaging.getToken();
   }
 
   Future<bool> sendTokenToServer(String token) async {
+    if (kIsWeb) return false; // Skip for web
+
     try {
       final response = await http.post(
         Uri.parse('http://10.0.2.2:3000/send-token'),
@@ -63,8 +73,24 @@ class NotificationService {
     }
   }
 
-  /// Show a local notification from a RemoteMessage
+  Future<void> saveTokenToFirestore(String token) async {
+    if (kIsWeb) return; // Skip for web
+
+    try {
+      String userId = FirebaseAuth.instance.currentUser!.uid;
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .update({'fcmToken': token});
+      print('✅ FCM Token saved to Firestore');
+    } catch (e) {
+      print('🚨 Error saving FCM token to Firestore: $e');
+    }
+  }
+
   void showLocalNotification(RemoteMessage message) {
+    if (kIsWeb) return; // Skip for web
+
     final notification = message.notification;
     final android = message.notification?.android;
 
@@ -86,4 +112,30 @@ class NotificationService {
       );
     }
   }
+
+ Future<bool> sendTaskAssignmentNotification(String technicianUid, String ticketId, String taskDetails) async {
+  try {
+    final response = await http.post(
+      Uri.parse('http://10.0.2.2:3000/assign-task'),  // Use your actual server URL
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'technicianUid': technicianUid,
+        'ticketId': ticketId,
+        'taskDetails': taskDetails,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      print('✅ Task assignment notification sent successfully');
+      return true;
+    } else {
+      print('❌ Failed to send task assignment notification: ${response.statusCode}');
+      print('Response body: ${response.body}');
+      return false;
+    }
+  } catch (e) {
+    print('🚨 HTTP error while sending task assignment notification: $e');
+    return false;
+  }
+}
 }

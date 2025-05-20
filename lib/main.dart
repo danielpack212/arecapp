@@ -14,8 +14,7 @@ import 'notification_service.dart';
 import 'landing_page.dart';
 import 'package:provider/provider.dart';
 import 'user_provider.dart';
-import 'chat_provider.dart'; 
-
+import 'chat_provider.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -38,15 +37,31 @@ Future<void> main() async {
     return;
   }
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  final notificationService = NotificationService();
 
-  await _setupFlutterNotifications();
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    await _setupFlutterNotifications();
 
-    runApp(
+    await notificationService.initializeLocalNotifications();
+
+    final authStatus = await notificationService.requestNotificationPermissions();
+    if (authStatus == AuthorizationStatus.authorized || authStatus == AuthorizationStatus.provisional) {
+      final token = await notificationService.getFCMToken();
+      print("FCM Token: $token");
+      if (token != null) {
+        await notificationService.sendTokenToServer(token);
+        await notificationService.saveTokenToFirestore(token);
+      }
+    }
+  }
+
+  runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => UserProvider()),
         ChangeNotifierProvider(create: (context) => ChatProvider()),
+        Provider<NotificationService>.value(value: notificationService),
       ],
       child: MyApp(),
     ),
@@ -118,7 +133,7 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  final NotificationService _notificationService = NotificationService();
+  late final NotificationService _notificationService;
   int _selectedIndex = 1;
 
   final List<Widget> _pages = [
@@ -130,23 +145,18 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
-    _initNotifications();
+    _notificationService = Provider.of<NotificationService>(context, listen: false);
+    if (!kIsWeb) {
+      _initNotifications();
+    }
     _fetchUserRole();
   }
-    Future<void> _fetchUserRole() async {
+
+  Future<void> _fetchUserRole() async {
     await Provider.of<UserProvider>(context, listen: false).fetchUserRole();
   }
 
   Future<void> _initNotifications() async {
-    final authStatus = await _notificationService.requestNotificationPermissions();
-    if (authStatus == AuthorizationStatus.authorized || authStatus == AuthorizationStatus.provisional) {
-      final token = await _notificationService.getFCMToken();
-      print("FCM Token: $token");
-      if (token != null) {
-        final success = await _notificationService.sendTokenToServer(token);
-      }
-    }
-
     FirebaseMessaging.onMessage.listen((message) {
       if (message.notification != null) {
         final notification = message.notification!;
@@ -174,35 +184,39 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   void _showNotificationDialog(String title, String body) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
-          )
-        ],
-      ),
-    );
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            )
+          ],
+        ),
+      );
+    }
   }
 
   void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Error'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
-          )
-        ],
-      ),
-    );
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text('Error'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            )
+          ],
+        ),
+      );
+    }
   }
 
   void _onItemTapped(int index) {
@@ -248,11 +262,6 @@ class _MainNavigationState extends State<MainNavigation> {
     } else {
       // Android version with bottom navigation bar
       return Scaffold(
-        //appBar: AppBar(
-         // backgroundColor: Colors.grey[900],
-         // title: const Text('Study Abroad', style: TextStyle(color: Colors.white)),
-          //centerTitle: true,
-      // ),
         body: _pages[_selectedIndex],
         bottomNavigationBar: BottomNavigationBar(
           backgroundColor: Colors.grey[900],
