@@ -1,22 +1,61 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+const String BASE_URL = 'http://192.168.204.45:5000/';
 
 class ChatProvider extends ChangeNotifier {
-  List<String> chatTitles = ['Pipe Burst', 'Electrical Shortage', 'Other Issues'];
-  List<List<Map<String, String>>> conversations = [
-    [{'sender': 'bot', 'text': 'Welcome to the Pipe Burst chat! How can I assist you with this issue?'}],
-    [{'sender': 'bot', 'text': 'Welcome to the Electrical Shortage chat! What details can you provide about the problem?'}],
-    [{'sender': 'bot', 'text': 'Welcome to the Other Issues chat! Please describe the maintenance problem you\'re facing.'}],
-  ];
+  List<String> chatTitles = [];
+  List<List<Map<String, String>>> conversations = [];
 
-  bool chatExists(String ticketId) {
-    return chatTitles.any((title) => title.contains(ticketId));
+bool chatExists(String symptom) {
+  return chatTitles.any((title) => title.endsWith('$symptom'));
+}
+
+
+Future<void> addNewChat(String ticketId, String symptom) async {
+  // Prevent duplicates here too
+  if (chatExists(symptom)) return;
+
+  chatTitles.add('$symptom');
+  List<Map<String, String>> newConversation = [];
+
+  try {
+    final response = await http.post(
+      Uri.parse('$BASE_URL/initial_chat'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        'ticketId': ticketId,
+        'symptom': symptom,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      var responseData = jsonDecode(response.body);
+      String initialMessage = responseData['message'];
+      newConversation.add({'sender': 'bot', 'text': initialMessage});
+    } else {
+      newConversation.add({
+        'sender': 'bot',
+        'text':
+            'Welcome to the chat for Task #$ticketId. How can I assist you with the $symptom issue?'
+      });
+    }
+  } catch (e) {
+    newConversation.add({
+      'sender': 'bot',
+      'text':
+          'Welcome to the chat for Task #$ticketId. How can I assist you with the $symptom issue?'
+    });
   }
-  
-  void addNewChat(String ticketId) {
-    chatTitles.add('Task #$ticketId');
-    conversations.add([{'sender': 'bot', 'text': 'Welcome to the chat for Task #$ticketId. How can I assist you?'}]);
-    notifyListeners();
-  }
+
+  conversations.add(newConversation);
+  notifyListeners();
+}
+
 
   void removeResolvedChat(String ticketId) {
     int index = chatTitles.indexWhere((title) => title.contains(ticketId));
