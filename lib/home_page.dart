@@ -10,32 +10,25 @@ class ChatbotPage extends StatefulWidget {
 
 class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController(); // Scroll controller
-
-  // Sample conversations for demonstration
+  final ScrollController _scrollController = ScrollController();
   List<List<Map<String, String>>> conversations = [
     [{'sender': 'bot', 'text': 'Welcome to Chat 1!'}],
     [{'sender': 'bot', 'text': 'Welcome to Chat 2!'}],
     [{'sender': 'bot', 'text': 'Welcome to Chat 3!'}],
   ];
   int selectedConversationIndex = 0;
-
-  bool _isListening = false;  // Track if the microphone is listening
-  String _speechText = '';     // Store recognized speech input
-  stt.SpeechToText _speech = stt.SpeechToText(); // Speech recognition instance
+  bool _isListening = false;
+  String _speechText = '';
+  stt.SpeechToText _speech = stt.SpeechToText();
 
   void _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
 
-    // Add user message to the conversation
     setState(() {
       conversations[selectedConversationIndex].add({'sender': 'user', 'text': message});
     });
 
-    // Clear the input field
     _controller.clear();
-
-    // Scroll to the bottom after sending a message
     _scrollToBottom();
 
     try {
@@ -53,7 +46,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
         var responseData = jsonDecode(response.body);
         String botReply = responseData['answer'];
 
-        // Add bot response to the conversation
         setState(() {
           conversations[selectedConversationIndex].add({'sender': 'bot', 'text': botReply});
         });
@@ -68,11 +60,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
       });
     }
 
-    // Scroll to the bottom after receiving a response
     _scrollToBottom();
   }
 
-  // Method to scroll to the bottom of the chat messages
   void _scrollToBottom() {
     Future.delayed(Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -86,14 +76,14 @@ class _ChatbotPageState extends State<ChatbotPage> {
       bool available = await _speech.initialize();
       if (available) {
         setState(() {
-          _isListening = true; // Start listening for voice input
-          _speechText = '';    // Clear previous text
+          _isListening = true;
+          _speechText = '';
         });
 
         _speech.listen(onResult: (result) {
           setState(() {
-            _speechText = result.recognizedWords; // Update recognized text
-            _controller.text = _speechText;       // Populate input field
+            _speechText = result.recognizedWords;
+            _controller.text = _speechText;
           });
         });
       }
@@ -103,7 +93,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
   void _stopListening() async {
     await _speech.stop();
     setState(() {
-      _isListening = false; // Stop listening
+      _isListening = false;
     });
   }
 
@@ -129,95 +119,104 @@ class _ChatbotPageState extends State<ChatbotPage> {
       appBar: AppBar(
         title: Text('Chatbot', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.grey[900],
-        actions: [
-          // Dropdown for selecting chat
-          DropdownButton<int>(
-            dropdownColor: Colors.grey[900],
-            value: selectedConversationIndex + 1,
-            icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-            onChanged: (int? newValue) {
-              setState(() {
-                selectedConversationIndex = newValue! - 1; // Convert 1,2,3 to 0,1,2
-                _scrollToBottom(); // Scroll to the bottom when changing chats
-              });
-            },
-            items: [
-              DropdownMenuItem<int>(
-                value: 1,
-                child: Text('Chat 1', style: TextStyle(color: Colors.white)),
-              ),
-              DropdownMenuItem<int>(
-                value: 2,
-                child: Text('Chat 2', style: TextStyle(color: Colors.white)),
-              ),
-              DropdownMenuItem<int>(
-                value: 3,
-                child: Text('Chat 3', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController, // Assign the controller
-              padding: EdgeInsets.all(8),
-              itemCount: conversations[selectedConversationIndex].length,
-              itemBuilder: (context, index) {
-                return _buildMessage(conversations[selectedConversationIndex][index]);
-              },
-            ),
-          ),
-          // Chat input area
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            color: Colors.grey[900],
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    onSubmitted: (value) {
-                      _sendMessage(value); // Send message on submit
+      body: SingleChildScrollView( // Use SingleChildScrollView to handle keyboard appearance
+        child: Column(
+          children: [
+            Container(
+              color: Colors.grey[900],
+              padding: EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  DropdownButton<int>(
+                    dropdownColor: Colors.grey[900],
+                    value: selectedConversationIndex + 1,
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                    onChanged: (int? newValue) {
+                      setState(() {
+                        selectedConversationIndex = newValue! - 1;
+                        _scrollToBottom();
+                      });
                     },
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Type your message...',
-                      hintStyle: TextStyle(color: Colors.grey[400]),
-                      filled: true,
-                      fillColor: Colors.grey[800],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                    items: [
+                      DropdownMenuItem<int>(
+                        value: 1,
+                        child: Text('Chat 1', style: TextStyle(color: Colors.white)),
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      DropdownMenuItem<int>(
+                        value: 2,
+                        child: Text('Chat 2', style: TextStyle(color: Colors.white)),
+                      ),
+                      DropdownMenuItem<int>(
+                        value: 3,
+                        child: Text('Chat 3', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Chat messages
+            Container(
+              height: 400, // Fixed height to allow scrolling
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: EdgeInsets.all(8),
+                itemCount: conversations[selectedConversationIndex].length,
+                itemBuilder: (context, index) {
+                  return _buildMessage(conversations[selectedConversationIndex][index]);
+                },
+              ),
+            ),
+            // Chat input area
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              color: Colors.grey[900],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      onSubmitted: (value) {
+                        _sendMessage(value);
+                      },
+                      style: TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Type your message...',
+                        hintStyle: TextStyle(color: Colors.grey[400]),
+                        filled: true,
+                        fillColor: Colors.grey[800],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(width: 8),
-                IconButton(
-                  icon: Icon(
+                  SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(
                       Icons.mic,
-                      color: _isListening ? Colors.red : Colors.white  // Highlight mic icon red when recording
+                      color: _isListening ? Colors.red : Colors.white,
+                    ),
+                    onPressed: () {
+                      if (_isListening) {
+                        _stopListening();
+                      } else {
+                        _startListening();
+                      }
+                    },
                   ),
-                  onPressed: () {
-                    if (_isListening) {
-                      _stopListening(); // Stop listening
-                    } else {
-                      _startListening(); // Start voice input listening
-                    }
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.send, color: Colors.white),
-                  onPressed: () => _sendMessage(_controller.text),
-                ),
-              ],
+                  IconButton(
+                    icon: Icon(Icons.send, color: Colors.white),
+                    onPressed: () => _sendMessage(_controller.text),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       resizeToAvoidBottomInset: true, // Ensures that layout will adjust when keyboard appears
     );
