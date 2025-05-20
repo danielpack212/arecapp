@@ -132,7 +132,6 @@ Future<void> addTaskToFirebase(Map<String, dynamic> taskData) async {
 
 
 // NEW filtering and sorting
-
 Query getFilteredAndSortedQuery() {
   Query query = FirebaseFirestore.instance.collection('tasks');
 
@@ -145,13 +144,6 @@ Query getFilteredAndSortedQuery() {
   }
   if (selectedLocation != 'All') {
     query = query.where('location', isEqualTo: selectedLocation);
-  }
-
-  // Apply sorting
-  if (sortBy == 'Date Opened') {
-    query = query.orderBy('dateOpened', descending: !sortAscending);
-  } else if (sortBy == 'Status') {
-    query = query.orderBy('status', descending: !sortAscending);
   }
 
   return query;
@@ -298,7 +290,6 @@ Widget _buildWebLayout(String? userRole) {
       ],
     );
   }
-
 List<Widget> _buildMobileRoleBasedContent(String? userRole) {
   return [
     StreamBuilder<QuerySnapshot>(
@@ -319,8 +310,8 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
             })
             .where((task) =>
               searchQuery.isEmpty ||
-              task['symptom'].toLowerCase().contains(searchQuery.toLowerCase()) ||
-              task['ticketId'].toLowerCase().contains(searchQuery.toLowerCase()))
+              (task['symptom'] ?? '').toLowerCase().contains(searchQuery.toLowerCase()) ||
+              (task['ticketId'] ?? '').toLowerCase().contains(searchQuery.toLowerCase()))
             .toList();
         
         if (userRole == 'Maintenance Technician') {
@@ -328,19 +319,15 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
           tasks = tasks.where((task) => task['assignedTo'] == currentUserUid).toList();
         }
         
+        if (tasks.isEmpty) {
+          return Center(child: Text('No tasks match the current filters'));
+        }
+        
         return Column(
           children: tasks.map((data) => _buildMobileTableRow(data, userRole)).toList(),
         );
       },
     ),
-    if (userRole == 'Energy Expert') ...[
-      SizedBox(height: 20),
-      Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.0),
-        child: Text('Energy Consumption Analysis', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ),
-      // Add energy consumption analysis widgets here
-    ],
   ];
 }
 
@@ -382,69 +369,108 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
   );
 }
 
-  Widget _buildMobileTableRow(Map<String, dynamic> data, String? userRole) {
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ExpansionTile(
-        title: Text(data['symptom'], style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${data['location']} - ${data['status']}'),
-        children: [
-          ListTile(title: Text('Date Opened: ${data['dateOpened']}')),
-          ListTile(title: Text('Ticket ID: ${data['ticketId']}')),
-          if (userRole == 'Energy Expert')
-            ListTile(title: Text('Assigned To: ${data['assignedTo'] ?? 'Unassigned'}')),
-          if (userRole == 'Maintenance Technician')
-            ListTile(title: Text('Assigned By: ${data['assignedBy'] ?? 'Unassigned'}')),
+ Widget _buildMobileTableRow(Map<String, dynamic> data, String? userRole) {
+  return Card(
+    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    child: ExpansionTile(
+      title: Text(data['symptom'] ?? 'No symptom', style: TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text('${data['location'] ?? 'No location'} - ${data['status'] ?? 'No status'}'),
+      children: [
+        ListTile(title: Text('Date Opened: ${data['dateOpened'] ?? 'Unknown'}')),
+        ListTile(title: Text('Ticket ID: ${data['ticketId'] ?? 'Unknown'}')),
+        if (userRole == 'Energy Expert')
+          ListTile(title: Text('Assigned To: ${data['assignedToName'] ?? 'Unassigned'}')),
+        if (userRole == 'Maintenance Technician')
+          FutureBuilder<String>(
+            future: _getAssignedByName(data['assignedBy']),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return ListTile(title: CircularProgressIndicator());
+              }
+              return ListTile(title: Text('Assigned By: ${snapshot.data ?? 'Unknown'}'));
+            },
+          ),
+        if (data['subSymptoms'] != null && (data['subSymptoms'] as List).isNotEmpty)
           ListTile(
             title: Text('Sub-symptoms:'),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: data['subSymptoms'].map<Widget>((subSymptom) {
-                return Text('${subSymptom['name']}: ${subSymptom['percentage']}%');
+              children: (data['subSymptoms'] as List).map<Widget>((subSymptom) {
+                return Text('${subSymptom['name'] ?? 'Unknown'}: ${subSymptom['percentage'] ?? 'Unknown'}%');
               }).toList(),
             ),
           ),
-          if (userRole == 'Energy Expert')
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: ElevatedButton(
-                child: Text('Assign Technician'),
-                onPressed: () => _showAssignTechnicianDialog(context, data),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterBar() {
-    return Row(
-      children: [
-        Expanded(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildFilterButton('Classification', classifications, selectedClassification, (value) {
-                setState(() => selectedClassification = value!);
-              }),
-              _buildFilterButton('Status', statuses, selectedStatus, (value) {
-                setState(() => selectedStatus = value!);
-              }),
-              _buildFilterButton('Location', locations, selectedLocation, (value) {
-                setState(() => selectedLocation = value!);
-              }),
-              _buildSortByButton(),
-            ],
+        if (userRole == 'Energy Expert')
+          FutureBuilder<List<String>>(
+            future: _fetchTechniciansForBuilding(data['location']),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return ListTile(title: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return ListTile(title: Text('Error: ${snapshot.error}'));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return ListTile(title: Text('No technicians available'));
+              } else {
+                return ListTile(
+                  title: Text('Available Technicians:'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: snapshot.data!.map((tech) => Text(tech)).toList(),
+                  ),
+                );
+              }
+            },
           ),
-        ),
-        SizedBox(width: 16),
-        Expanded(
-          child: _buildSearchBar(),
-        ),
+        if (userRole == 'Energy Expert')
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: ElevatedButton(
+              child: Text('Assign Technician'),
+              onPressed: () => _showAssignTechnicianDialog(context, data),
+            ),
+          ),
       ],
-    );
-  }
+    ),
+  );
+}
+Widget _buildFilterBar() {
+  return Row(
+    children: [
+      Expanded(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildFilterButton('Classification', classifications, selectedClassification, (value) {
+              setState(() => selectedClassification = value!);
+            }),
+            _buildFilterButton('Status', statuses, selectedStatus, (value) {
+              setState(() => selectedStatus = value!);
+            }),
+            _buildFilterButton('Location', locations, selectedLocation, (value) {
+              setState(() => selectedLocation = value!);
+            }),
+            _buildSortByButton(),
+            ElevatedButton(
+              child: Text('Reset Filters'),
+              onPressed: () {
+                setState(() {
+                  selectedClassification = 'All';
+                  selectedStatus = 'All';
+                  selectedLocation = 'All';
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+      SizedBox(width: 16),
+      Expanded(
+        child: _buildSearchBar(),
+      ),
+    ],
+  );
+}
 
 Widget _buildFilterButton(String label, List<String> items, String value, void Function(String?) onChanged) {
   return Container(
@@ -584,13 +610,14 @@ Widget _buildRoleBasedContent(String? userRole) {
         return Center(child: CircularProgressIndicator());
       }
       
+      if (snapshot.hasError) {
+        print('Error: ${snapshot.error}');
+        return Center(child: Text('An error occurred: ${snapshot.error}'));
+      }
+
       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
         return Center(
-          child: Text(
-            userRole == 'Maintenance Technician' 
-                ? 'No tasks assigned yet.' 
-                : 'No tasks available.'
-          ),
+          child: Text('No tasks match the current filters.'),
         );
       }
       
@@ -611,6 +638,12 @@ Widget _buildRoleBasedContent(String? userRole) {
         tasks = tasks.where((task) => task['assignedTo'] == currentUserUid).toList();
       }
       
+      if (tasks.isEmpty) {
+        return Center(
+          child: Text('No tasks match the current filters.'),
+        );
+      }
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -698,6 +731,7 @@ Future<String> _getAssignedByName(String? uid) async {
 
 
 }
+
 Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
   return Container(
     padding: EdgeInsets.all(8),
@@ -712,6 +746,13 @@ Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
             children: [
               Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
               Text(data['symptom'] ?? 'No description available'),
+              SizedBox(height: 8),
+              if (data['subSymptoms'] != null && (data['subSymptoms'] as List).isNotEmpty) ...[
+                Text('Sub-symptoms:', style: TextStyle(fontWeight: FontWeight.bold)),
+                ...data['subSymptoms'].map<Widget>((subSymptom) {
+                  return Text('${subSymptom['name']}: ${subSymptom['percentage']}%');
+                }).toList(),
+              ],
             ],
           ),
         ),
@@ -1030,7 +1071,6 @@ Future<String> _getTechnicianName(String? userRole) async {
   }
   return '';
 }
-
 void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
   final userRole = context.read<UserProvider>().userRole;
 
@@ -1054,16 +1094,25 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
+                    flex: 2,
                     child: Text(
                       '${data['symptom']}',
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Text('${data['location']}', style: TextStyle(color: Colors.black)),
-                  Text('Status: ${data['status']}', style: TextStyle(color: Colors.black)),
-                  Text('Ticket #${data['ticketId']}', style: TextStyle(color: Colors.black)),
-                  Text('Opened ${data['dateOpened']}', style: TextStyle(color: Colors.black)),
+                  Expanded(
+                    child: Text('${data['location']}', style: TextStyle(color: Colors.black)),
+                  ),
+                  Expanded(
+                    child: Text('Status: ${data['status']}', style: TextStyle(color: Colors.black)),
+                  ),
+                  Expanded(
+                    child: Text('Ticket #${data['ticketId']}', style: TextStyle(color: Colors.black)),
+                  ),
+                  Expanded(
+                    child: Text('Opened ${data['dateOpened']}', style: TextStyle(color: Colors.black)),
+                  ),
                 ],
               ),
               SizedBox(height: 20),
@@ -1074,7 +1123,8 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
                     children: [
                       _buildDetailSection('Classification', [data['classification'] ?? 'N/A'], isWide: true),
                       SizedBox(height: 16),
-                      _buildDetailSection('Description', [data['symptom'] ?? 'N/A'], isWide: true),
+                      if (data['description'] != null && data['description'].isNotEmpty)
+                        _buildDetailSection('Description', [data['description']], isWide: true),
                       SizedBox(height: 16),
                       if (data['subSymptoms'] != null && (data['subSymptoms'] as List).isNotEmpty)
                         _buildDetailSection('Sub-symptoms', 
@@ -1084,34 +1134,22 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
                           isWide: true
                         ),
                       SizedBox(height: 16),
-                      if (userRole == 'Energy Expert') ...[
-                        _buildDetailSection('Energy Impact', [
-                          'Estimated energy loss: 150 kWh',
-                          'Potential cost increase: \$30 per day',
-                          'Recommended action: Prioritize repair to minimize energy waste'
-                        ], isWide: true),
-                        SizedBox(height: 16),
-                        _buildDetailSection('Assigned To', [data['assignedToName'] ?? 'Unassigned'], isWide: true),
-                      ] else if (userRole == 'Maintenance Technician') ...[
-                        _buildDetailSection('Maintenance Log', [
-                          '1. Immediate water shutoff to prevent further damage',
-                          '2. Assessment of the extent of water damage',
-                          '3. Locating and repairing the burst pipe',
-                          '4. Drying and dehumidifying affected areas',
-                          '5. Checking for mold growth and treating if necessary',
-                          '6. Restoring any damaged structures or furnishings'
-                        ], isWide: true),
-                        SizedBox(height: 16),
-                        FutureBuilder<String>(
-                          future: _getAssignedByName(data['assignedBy']),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return CircularProgressIndicator();
-                            }
-                            return _buildDetailSection('Assigned By', [snapshot.data ?? 'Unknown'], isWide: true);
-                          },
-                        ),
-                      ],
+                      _buildDetailSection('Assigned To', [data['assignedToName'] ?? 'Unassigned'], isWide: true),
+                      SizedBox(height: 16),
+                      FutureBuilder<List<String>>(
+                        future: _fetchTechniciansForBuilding(data['location']),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return CircularProgressIndicator();
+                          } else if (snapshot.hasError) {
+                            return Text('Error: ${snapshot.error}');
+                          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return Text('No technicians available');
+                          } else {
+                            return _buildDetailSection('Available Technicians', snapshot.data!, isWide: true);
+                          }
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -1140,6 +1178,7 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
     },
   );
 }
+
   Widget _buildDetailSection(String title, List<String> items, {bool isWide = false}) {
     return Container(
       width: isWide ? double.infinity : null,

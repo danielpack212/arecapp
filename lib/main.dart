@@ -244,11 +244,11 @@ class _MainNavigationState extends State<MainNavigation> {
     } else {
       // Android version with bottom navigation bar
       return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.grey[900],
-          title: const Text('Study Abroad', style: TextStyle(color: Colors.white)),
-          centerTitle: true,
-        ),
+        //appBar: AppBar(
+         // backgroundColor: Colors.grey[900],
+         // title: const Text('Study Abroad', style: TextStyle(color: Colors.white)),
+          //centerTitle: true,
+      // ),
         body: _pages[_selectedIndex],
         bottomNavigationBar: BottomNavigationBar(
           backgroundColor: Colors.grey[900],
