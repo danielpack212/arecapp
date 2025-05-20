@@ -14,6 +14,7 @@ import 'notification_service.dart';
 import 'landing_page.dart';
 import 'package:provider/provider.dart';
 import 'user_provider.dart';
+import 'chat_provider.dart'; 
 
 
 @pragma('vm:entry-point')
@@ -42,8 +43,11 @@ Future<void> main() async {
   await _setupFlutterNotifications();
 
     runApp(
-    ChangeNotifierProvider(
-      create: (context) => UserProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => UserProvider()),
+        ChangeNotifierProvider(create: (context) => ChatProvider()),
+      ],
       child: MyApp(),
     ),
   );

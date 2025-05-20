@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'user_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'chat_provider.dart'; // Make sure you've created this file
 
 class MaintenanceLogPage extends StatefulWidget {
   @override
@@ -99,11 +101,32 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   },
   ];
 
+
+void listenForNewTasks() {
+  FirebaseFirestore.instance
+      .collection('tasks')
+      .snapshots()
+      .listen((snapshot) {
+    for (var change in snapshot.docChanges) {
+      if (change.type == DocumentChangeType.added) {
+        var newTask = change.doc.data() as Map<String, dynamic>;
+        String ticketId = newTask['ticketId'];
+        
+        // Check if a chat for this ticket already exists
+        if (!Provider.of<ChatProvider>(context, listen: false).chatExists(ticketId)) {
+          createNewChatTab(ticketId);
+        }
+      }
+    }
+  });
+}
+
  //initialize tasks in firebase
  @override
 void initState() {
   super.initState();
   initializeFirestoreWithDummyData();
+  listenForNewTasks();
 }
 
  Future<bool> tasksExistInFirestore() async {
@@ -147,6 +170,23 @@ Query getFilteredAndSortedQuery() {
   }
 
   return query;
+}
+
+// create new chat
+void createNewChatTab(String ticketId) {
+  // You'll need to implement a way to communicate between pages
+  // One way is to use a global state management solution like Provider
+  Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId);
+}
+
+// close chat 
+void checkAndRemoveResolvedChats(List<Map<String, dynamic>> tasks) {
+  for (var task in tasks) {
+    if (task['status'] == 'Resolved') {
+      String ticketId = task['ticketId'];
+      Provider.of<ChatProvider>(context, listen: false).removeResolvedChat(ticketId);
+    }
+  }
 }
 
 // new methods
@@ -290,6 +330,7 @@ Widget _buildWebLayout(String? userRole) {
       ],
     );
   }
+
 List<Widget> _buildMobileRoleBasedContent(String? userRole) {
   return [
     StreamBuilder<QuerySnapshot>(
@@ -602,7 +643,7 @@ Widget _buildSearchBar() {
     );
   }
 
-Widget _buildRoleBasedContent(String? userRole) {
+ Widget _buildRoleBasedContent(String? userRole) {
   return StreamBuilder<QuerySnapshot>(
     stream: getFilteredAndSortedQuery().snapshots(),
     builder: (context, snapshot) {
@@ -632,6 +673,9 @@ Widget _buildRoleBasedContent(String? userRole) {
             task['symptom'].toLowerCase().contains(searchQuery.toLowerCase()) ||
             task['ticketId'].toLowerCase().contains(searchQuery.toLowerCase()))
           .toList();
+      
+      // Check and remove resolved chats
+      checkAndRemoveResolvedChats(tasks);
       
       if (userRole == 'Maintenance Technician') {
         String currentUserUid = FirebaseAuth.instance.currentUser!.uid;
@@ -991,7 +1035,11 @@ void _createNewTask(String symptom, String classification, String location, Stri
       }
     }
 
-    await FirebaseFirestore.instance.collection('tasks').add({
+    // Generate a unique ticketId
+    String ticketId = 'CTH' + DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+
+    // Add the task to Firestore
+    DocumentReference docRef = await FirebaseFirestore.instance.collection('tasks').add({
       'symptom': symptom,
       'classification': classification,
       'location': location,
@@ -1000,12 +1048,20 @@ void _createNewTask(String symptom, String classification, String location, Stri
       'assignedToName': technicianUid != null ? technician : null,
       'assignedBy': technicianUid != null ? FirebaseAuth.instance.currentUser!.uid : null,
       'dateOpened': _formatDate(DateTime.now()),
-      'ticketId': 'CTH' + DateTime.now().millisecondsSinceEpoch.toString().substring(7),
-      'subSymptoms': [], // Add this line
+      'ticketId': ticketId,
+      'subSymptoms': [],
     });
+
+    // Create a new chat for this task
+    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('New task created successfully')),
     );
+
+    // Optionally, you can update the document with its Firestore-generated ID
+    await docRef.update({'id': docRef.id});
+
   } catch (e) {
     print('Error creating new task: $e');
     ScaffoldMessenger.of(context).showSnackBar(

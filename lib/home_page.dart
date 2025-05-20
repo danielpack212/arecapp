@@ -4,6 +4,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'sidebar.dart';
+import 'chat_provider.dart';
+import 'package:provider/provider.dart';
+
+const String BASE_URL = 'http://192.168.204.45:5000/'; // Replace with your new IP address
 
 class ChatbotPage extends StatefulWidget {
   @override
@@ -14,14 +18,15 @@ class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  List<List<Map<String, String>>> conversations = [
-    [{'sender': 'bot', 'text': 'Welcome to the Pipe Burst chat! How can I assist you with this issue?'}],
-    [{'sender': 'bot', 'text': 'Welcome to the Electrical Shortage chat! What details can you provide about the problem?'}],
-    [{'sender': 'bot', 'text': 'Welcome to the Other Issues chat! Please describe the maintenance problem you\'re facing.'}],
-  ];
-  int selectedConversationIndex = 0;
+  late ChatProvider _chatProvider;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  }
 
-  List<String> chatTitles = ['Pipe Burst', 'Electrical Shortage', 'Other Issues'];
+
+  int selectedConversationIndex = 0;
 
   bool _isListening = false;
   String _speechText = '';
@@ -31,11 +36,18 @@ class _ChatbotPageState extends State<ChatbotPage> {
     return kIsWeb;
   }
 
-  void _sendMessage(String message) async {
+
+  @override
+  void initState() {
+    super.initState();
+    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  }
+
+    void _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
 
     setState(() {
-      conversations[selectedConversationIndex].add({'sender': 'user', 'text': message});
+      _chatProvider.conversations[selectedConversationIndex].add({'sender': 'user', 'text': message});
     });
 
     _controller.clear();
@@ -43,12 +55,13 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.204.31:5000/chat'), // Update this URL to your server
+        Uri.parse('$BASE_URL/chat'),
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
         },
         body: jsonEncode(<String, String>{
           'text': message,
+          'ticketId': _chatProvider.chatTitles[selectedConversationIndex].split('#').last,
         }),
       );
 
@@ -57,21 +70,22 @@ class _ChatbotPageState extends State<ChatbotPage> {
         String botReply = responseData['answer'];
 
         setState(() {
-          conversations[selectedConversationIndex].add({'sender': 'bot', 'text': botReply});
+          _chatProvider.conversations[selectedConversationIndex].add({'sender': 'bot', 'text': botReply});
         });
       } else {
         setState(() {
-          conversations[selectedConversationIndex].add({'sender': 'bot', 'text': 'Failed to get response!'});
+          _chatProvider.conversations[selectedConversationIndex].add({'sender': 'bot', 'text': 'Failed to get response!'});
         });
       }
     } catch (e) {
       setState(() {
-        conversations[selectedConversationIndex].add({'sender': 'bot', 'text': 'Error: ${e.toString()}'});
+        _chatProvider.conversations[selectedConversationIndex].add({'sender': 'bot', 'text': 'Error: ${e.toString()}'});
       });
     }
 
     _scrollToBottom();
   }
+
 
   void _scrollToBottom() {
     Future.delayed(Duration(milliseconds: 100), () {
@@ -126,18 +140,18 @@ class _ChatbotPageState extends State<ChatbotPage> {
   Widget _buildDropdown() {
     return DropdownButton<int>(
       dropdownColor: Colors.grey[900],
-      value: selectedConversationIndex + 1,
+      value: selectedConversationIndex,
       icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
       onChanged: (int? newValue) {
         setState(() {
-          selectedConversationIndex = newValue! - 1;
+          selectedConversationIndex = newValue!;
           _scrollToBottom();
         });
       },
-      items: List.generate(chatTitles.length, (index) {
+      items: List.generate(_chatProvider.chatTitles.length, (index) {
         return DropdownMenuItem<int>(
-          value: index + 1,
-          child: Text(chatTitles[index], style: TextStyle(color: Colors.white)),
+          value: index,
+          child: Text(_chatProvider.chatTitles[index], style: TextStyle(color: Colors.white)),
         );
       }),
     );
@@ -147,9 +161,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.all(8),
-      itemCount: conversations[selectedConversationIndex].length,
+      itemCount: _chatProvider.conversations[selectedConversationIndex].length,
       itemBuilder: (context, index) {
-        return _buildMessage(conversations[selectedConversationIndex][index]);
+        return _buildMessage(_chatProvider.conversations[selectedConversationIndex][index]);
       },
     );
   }
@@ -211,12 +225,11 @@ class _ChatbotPageState extends State<ChatbotPage> {
       ],
     );
   }
-
   Widget _buildWebLayout() {
     return Row(
       children: [
         Sidebar(
-          conversations: chatTitles,
+          conversations: _chatProvider.chatTitles,
           onConversationSelected: (index) {
             setState(() {
               selectedConversationIndex = index;
