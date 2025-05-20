@@ -5,7 +5,6 @@ import 'user_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-
 class MaintenanceLogPage extends StatefulWidget {
   @override
   _MaintenanceLogPageState createState() => _MaintenanceLogPageState();
@@ -14,7 +13,7 @@ class MaintenanceLogPage extends StatefulWidget {
 class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   String searchQuery = '';
   List<String> classifications = ['All', 'Plumbing', 'Electrical', 'HVAC'];
-  List<String> statuses = ['All', 'Action Required', 'In Progress', 'Resolved'];
+  List<String> statuses = ['All', 'Action Required', 'Assigned'];
   List<String> locations = ['All', 'Hofburg', 'TUWien'];
   String selectedClassification = 'All';
   String selectedStatus = 'All';
@@ -134,7 +133,7 @@ Future<void> addTaskToFirebase(Map<String, dynamic> taskData) async {
 
 // NEW filtering and sorting
 
-  Query getFilteredAndSortedQuery() {
+Query getFilteredAndSortedQuery() {
   Query query = FirebaseFirestore.instance.collection('tasks');
 
   // Apply filters
@@ -203,60 +202,56 @@ void updateSearch(String query) {
               : _buildMobileLayout(userRole),
         );
       }
-  Widget _buildWebLayout(String? userRole) {
-    return Padding(
-      padding: EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(height: 16),
-          _buildFilterBar(),
-          SizedBox(height: 16),
-          _buildTableHeader(userRole),
-          Expanded(
-            child: _buildRoleBasedContent(userRole),
-          ),
-          _buildCreateNewTaskButton(context),
-        ],
-      ),
-    );
-  }
-  Widget _buildMobileLayout(String? userRole) {
-    return Scaffold(
-      appBar: AppBar(
-        //title: Text(userRole == 'Maintenance Technician' ? 'Maintenance View' : 'Energy Expert View'),
-        actions: [
-          IconButton(
-            icon: Icon(_showMobileFilters ? Icons.filter_list_off : Icons.filter_list),
-            onPressed: () {
-              setState(() {
-                _showMobileFilters = !_showMobileFilters;
-              });
-            },
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          // Implement refresh logic here
-          setState(() {
-            // Refresh your data
-          });
-        },
-        child: ListView(
-          children: [
-            if (_showMobileFilters)
-              Padding(
-                padding: EdgeInsets.all(16.0),
-                child: _buildMobileFilterBar(),
-              ),
-            ..._buildMobileRoleBasedContent(userRole),
-          ],
+Widget _buildWebLayout(String? userRole) {
+  return Padding(
+    padding: EdgeInsets.all(16.0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 16),
+        _buildFilterBar(),
+        SizedBox(height: 16),
+        _buildTableHeader(userRole),
+        Expanded(
+          child: _buildRoleBasedContent(userRole),
         ),
+        if (userRole == 'Energy Expert') _buildCreateNewTaskButton(context),
+      ],
+    ),
+  );
+}
+  Widget _buildMobileLayout(String? userRole) {
+  return Scaffold(
+    appBar: AppBar(
+      actions: [
+        IconButton(
+          icon: Icon(_showMobileFilters ? Icons.filter_list_off : Icons.filter_list),
+          onPressed: () {
+            setState(() {
+              _showMobileFilters = !_showMobileFilters;
+            });
+          },
+        ),
+      ],
+    ),
+    body: RefreshIndicator(
+      onRefresh: () async {
+        setState(() {});
+      },
+      child: ListView(
+        children: [
+          if (_showMobileFilters)
+            Padding(
+              padding: EdgeInsets.all(16.0),
+              child: _buildMobileFilterBar(),
+            ),
+          ..._buildMobileRoleBasedContent(userRole),
+        ],
       ),
-      floatingActionButton: _buildCreateNewTaskButton(context),
-    );
-  }
+    ),
+    // Remove the floatingActionButton
+  );
+}
 
   Widget _buildMobileHeader(String? userRole) {
     return Container(
@@ -450,6 +445,7 @@ List<Widget> _buildMobileRoleBasedContent(String? userRole) {
       ],
     );
   }
+
 Widget _buildFilterButton(String label, List<String> items, String value, void Function(String?) onChanged) {
   return Container(
     decoration: BoxDecoration(
@@ -469,8 +465,20 @@ Widget _buildFilterButton(String label, List<String> items, String value, void F
         ),
       ),
       onSelected: (String newValue) {
+        setState(() {
+          switch (label.toLowerCase()) {
+            case 'classification':
+              selectedClassification = newValue;
+              break;
+            case 'status':
+              selectedStatus = newValue;
+              break;
+            case 'location':
+              selectedLocation = newValue;
+              break;
+          }
+        });
         onChanged(newValue);
-        updateFilter(label.toLowerCase(), newValue);
       },
       itemBuilder: (BuildContext context) {
         return items.map<PopupMenuItem<String>>((String item) {
@@ -483,6 +491,7 @@ Widget _buildFilterButton(String label, List<String> items, String value, void F
     ),
   );
 }
+
 Widget _buildSortByButton() {
   return Container(
     decoration: BoxDecoration(
@@ -566,6 +575,7 @@ Widget _buildSearchBar() {
       ),
     );
   }
+
 Widget _buildRoleBasedContent(String? userRole) {
   return StreamBuilder<QuerySnapshot>(
     stream: getFilteredAndSortedQuery().snapshots(),
@@ -573,8 +583,15 @@ Widget _buildRoleBasedContent(String? userRole) {
       if (snapshot.connectionState == ConnectionState.waiting) {
         return Center(child: CircularProgressIndicator());
       }
+      
       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        return Center(child: Text('No tasks available'));
+        return Center(
+          child: Text(
+            userRole == 'Maintenance Technician' 
+                ? 'No tasks assigned yet.' 
+                : 'No tasks available.'
+          ),
+        );
       }
       
       List<Map<String, dynamic>> tasks = snapshot.data!.docs
@@ -678,8 +695,9 @@ Future<String> _getAssignedByName(String? uid) async {
   if (uid == null) return 'Unknown';
   DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
   return doc.get('name') as String? ?? 'Unknown';
-}
 
+
+}
 Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
   return Container(
     padding: EdgeInsets.all(8),
@@ -692,10 +710,8 @@ Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Sub-symptoms:', style: TextStyle(fontWeight: FontWeight.bold)),
-              ...data['subSymptoms'].map<Widget>((subSymptom) {
-                return Text('${subSymptom['name']}: ${subSymptom['percentage']}%');
-              }).toList(),
+              Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(data['symptom'] ?? 'No description available'),
             ],
           ),
         ),
@@ -726,7 +742,15 @@ Widget _buildExpandedContent(Map<String, dynamic> data, String? userRole) {
                   },
                 )
               else
-                Text(data['assignedBy'] ?? 'Unassigned'),
+                FutureBuilder<String>(
+                  future: _getAssignedByName(data['assignedBy']),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return CircularProgressIndicator();
+                    }
+                    return Text(snapshot.data ?? 'Unknown');
+                  },
+                ),
             ],
           ),
         ),
@@ -755,130 +779,235 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
     },
   );
 }
-
 void showCreateTaskDialog(BuildContext context, String? userRole) {
+  String symptom = '';
   String classification = '';
-  String building = '';
   String location = '';
   String technician = '';
-  String notes = '';
+  List<Map<String, dynamic>> subSymptoms = [];
 
   showDialog(
     context: context,
     builder: (BuildContext context) {
-      return FutureBuilder<String>(
-        future: _getTechnicianName(userRole),
-        builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return AlertDialog(
-              title: Text('Error'),
-              content: Text('Failed to load technician data.'),
-              actions: [
-                TextButton(
-                  child: Text('OK'),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            );
-          } else {
-            technician = snapshot.data ?? '';
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.8,
-                height: MediaQuery.of(context).size.height * 0.9,
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Create New Task',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                    SizedBox(height: 20),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TextField(
-                              decoration: InputDecoration(labelText: 'Classification'),
-                              onChanged: (value) => classification = value,
-                            ),
-                            SizedBox(height: 16),
-                            TextField(
-                              decoration: InputDecoration(labelText: 'Building'),
-                              onChanged: (value) => building = value,
-                            ),
-                            SizedBox(height: 16),
-                            TextField(
-                              decoration: InputDecoration(labelText: 'Location'),
-                              onChanged: (value) => location = value,
-                            ),
-                            SizedBox(height: 16),
-                            userRole == 'Maintenance Technician'
-                              ? TextField(
-                                  decoration: InputDecoration(labelText: 'Technician'),
-                                  enabled: false,
-                                  controller: TextEditingController(text: technician),
-                                )
-                              : DropdownButtonFormField<String>(
-                                  decoration: InputDecoration(labelText: 'Technician'),
-                                  value: technician.isEmpty ? null : technician,
-                                  onChanged: (value) => technician = value!,
-                                  items: <String>['Technician 1', 'Technician 2', 'Technician 3']
-                                    .map<DropdownMenuItem<String>>((String value) {
+      return StatefulBuilder(
+        builder: (BuildContext context, StateSetter setState) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.8,
+              height: MediaQuery.of(context).size.height * 0.9,
+              padding: EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Create New Task',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  SizedBox(height: 20),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            decoration: _inputDecoration('Symptom'),
+                            onChanged: (value) => symptom = value,
+                          ),
+                          SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            decoration: _inputDecoration('Classification'),
+                            value: classification.isEmpty ? null : classification,
+                            items: ['Plumbing', 'Electrical', 'HVAC'].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() => classification = value!);
+                            },
+                          ),
+                          SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            decoration: _inputDecoration('Location'),
+                            value: location.isEmpty ? null : location,
+                            items: ['Hofburg', 'TUWien', 'The Loft'].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                location = value!;
+                                technician = ''; // Reset technician when location changes
+                              });
+                            },
+                          ),
+                          SizedBox(height: 16),
+                          if (location.isNotEmpty)
+                            FutureBuilder<List<String>>(
+                              future: _fetchTechniciansForBuilding(location),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return CircularProgressIndicator();
+                                } else if (snapshot.hasError) {
+                                  return Text('Error: ${snapshot.error}');
+                                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                  return Text('No technicians available');
+                                } else {
+                                  return DropdownButtonFormField<String>(
+                                    decoration: _inputDecoration('Technician'),
+                                    value: technician.isEmpty ? null : technician,
+                                    items: snapshot.data!.map((String value) {
                                       return DropdownMenuItem<String>(
                                         value: value,
                                         child: Text(value),
                                       );
                                     }).toList(),
-                                ),
-                            SizedBox(height: 16),
-                            TextField(
-                              decoration: InputDecoration(labelText: 'Notes'),
-                              maxLines: 5,
-                              onChanged: (value) => notes = value,
+                                    onChanged: (value) {
+                                      setState(() => technician = value!);
+                                    },
+                                  );
+                                }
+                              },
                             ),
-                          ],
-                        ),
+                          SizedBox(height: 16),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          child: Text('Cancel', style: TextStyle(color: Colors.red)),
-                          onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        child: Text('Cancel', style: TextStyle(color: Colors.red)),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      SizedBox(width: 16),
+                      ElevatedButton(
+                        child: Text('Create Task'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[900],
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         ),
-                        SizedBox(width: 16),
-                        ElevatedButton(
-                          child: Text('Submit Maintenance Request'),
-                          onPressed: () {
-                            // Here you would typically send the data to your backend
-                            print('Classification: $classification');
-                            print('Building: $building');
-                            print('Location: $location');
-                            print('Technician: $technician');
-                            print('Notes: $notes');
+                        onPressed: () {
+                          if (symptom.isNotEmpty && classification.isNotEmpty && location.isNotEmpty) {
+                            _createNewTask(symptom, classification, location, technician);
                             Navigator.of(context).pop();
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Please fill in all required fields')),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            );
-          }
+            ),
+          );
         },
+      );
+    },
+  );
+}
+
+InputDecoration _inputDecoration(String label) {
+  return InputDecoration(
+    labelText: label,
+    labelStyle: TextStyle(color: Colors.grey[800]),
+    filled: true,
+    fillColor: Colors.grey[200],
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+  );
+}
+
+String _formatDate(DateTime date) {
+  return '${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}-${date.year}';
+}
+
+void _createNewTask(String symptom, String classification, String location, String technician) async {
+  try {
+    String? technicianUid;
+    if (technician.isNotEmpty) {
+      QuerySnapshot technicianSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('name', isEqualTo: technician)
+          .limit(1)
+          .get();
+      if (technicianSnapshot.docs.isNotEmpty) {
+        technicianUid = technicianSnapshot.docs.first.id;
+      }
+    }
+
+    await FirebaseFirestore.instance.collection('tasks').add({
+      'symptom': symptom,
+      'classification': classification,
+      'location': location,
+      'status': technicianUid != null ? 'Assigned' : 'Action Required',
+      'assignedTo': technicianUid,
+      'assignedToName': technicianUid != null ? technician : null,
+      'assignedBy': technicianUid != null ? FirebaseAuth.instance.currentUser!.uid : null,
+      'dateOpened': _formatDate(DateTime.now()),
+      'ticketId': 'CTH' + DateTime.now().millisecondsSinceEpoch.toString().substring(7),
+      'subSymptoms': [], // Add this line
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('New task created successfully')),
+    );
+  } catch (e) {
+    print('Error creating new task: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to create new task')),
+    );
+  }
+}
+
+Future<Map<String, dynamic>?> _addSubSymptom(BuildContext context) async {
+  String name = '';
+  int percentage = 0;
+
+  return showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Add Sub-symptom'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: InputDecoration(labelText: 'Name'),
+              onChanged: (value) => name = value,
+            ),
+            TextField(
+              decoration: InputDecoration(labelText: 'Percentage'),
+              keyboardType: TextInputType.number,
+              onChanged: (value) => percentage = int.tryParse(value) ?? 0,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          ElevatedButton(
+            child: Text('Add'),
+            onPressed: () {
+              Navigator.of(context).pop({'name': name, 'percentage': percentage});
+            },
+          ),
+        ],
       );
     },
   );
@@ -924,9 +1053,12 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${data['symptom']}',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+                  Expanded(
+                    child: Text(
+                      '${data['symptom']}',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   Text('${data['location']}', style: TextStyle(color: Colors.black)),
                   Text('Status: ${data['status']}', style: TextStyle(color: Colors.black)),
@@ -940,14 +1072,17 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailSection('Classification', [data['classification']], isWide: true),
+                      _buildDetailSection('Classification', [data['classification'] ?? 'N/A'], isWide: true),
                       SizedBox(height: 16),
-                      _buildDetailSection('Sub-symptoms', 
-                        data['subSymptoms'].map<String>((subSymptom) => 
-                          '${subSymptom['name']}: ${subSymptom['percentage']}%'
-                        ).toList(),
-                        isWide: true
-                      ),
+                      _buildDetailSection('Description', [data['symptom'] ?? 'N/A'], isWide: true),
+                      SizedBox(height: 16),
+                      if (data['subSymptoms'] != null && (data['subSymptoms'] as List).isNotEmpty)
+                        _buildDetailSection('Sub-symptoms', 
+                          (data['subSymptoms'] as List).map<String>((subSymptom) => 
+                            '${subSymptom['name']}: ${subSymptom['percentage']}%'
+                          ).toList(),
+                          isWide: true
+                        ),
                       SizedBox(height: 16),
                       if (userRole == 'Energy Expert') ...[
                         _buildDetailSection('Energy Impact', [
@@ -956,7 +1091,7 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
                           'Recommended action: Prioritize repair to minimize energy waste'
                         ], isWide: true),
                         SizedBox(height: 16),
-                        _buildDetailSection('Assigned To', [data['assignedTo'] ?? 'Unassigned'], isWide: true),
+                        _buildDetailSection('Assigned To', [data['assignedToName'] ?? 'Unassigned'], isWide: true),
                       ] else if (userRole == 'Maintenance Technician') ...[
                         _buildDetailSection('Maintenance Log', [
                           '1. Immediate water shutoff to prevent further damage',
@@ -967,7 +1102,15 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
                           '6. Restoring any damaged structures or furnishings'
                         ], isWide: true),
                         SizedBox(height: 16),
-                        _buildDetailSection('Assigned By', [data['assignedBy'] ?? 'Unassigned'], isWide: true),
+                        FutureBuilder<String>(
+                          future: _getAssignedByName(data['assignedBy']),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return CircularProgressIndicator();
+                            }
+                            return _buildDetailSection('Assigned By', [snapshot.data ?? 'Unknown'], isWide: true);
+                          },
+                        ),
                       ],
                     ],
                   ),
@@ -997,7 +1140,6 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
     },
   );
 }
-
   Widget _buildDetailSection(String title, List<String> items, {bool isWide = false}) {
     return Container(
       width: isWide ? double.infinity : null,

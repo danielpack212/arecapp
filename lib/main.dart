@@ -140,9 +140,6 @@ class _MainNavigationState extends State<MainNavigation> {
       print("FCM Token: $token");
       if (token != null) {
         final success = await _notificationService.sendTokenToServer(token);
-        if (!success) {
-          _showErrorDialog('Failed to send token to server.');
-        }
       }
     }
 
