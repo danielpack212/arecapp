@@ -1531,89 +1531,95 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
     );
   }
 
-  Future<void> _assignTechnician(
-      Map<String, dynamic> data, String? selectedTechnician) async {
-    try {
-      Map<String, dynamic> updateData;
+Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechnician) async {
+  try {
+    // Start a batch write
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+    
+    DocumentReference taskRef = FirebaseFirestore.instance.collection('tasks').doc(data['id']);
 
-      if (selectedTechnician == null) {
-        // Unassign the task
-        updateData = {
-          'status': 'Action Required',
-          'assignedTo': null,
-          'assignedToName': null,
-          'assignedBy': null,
-        };
-      } else {
-        // Assign the task to the selected technician
-        QuerySnapshot technicianSnapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .where('name', isEqualTo: selectedTechnician)
-            .limit(1)
-            .get();
+    Map<String, dynamic> updateData;
+    String? technicianUid;
 
-        if (technicianSnapshot.docs.isEmpty) {
-          throw Exception('Technician not found');
-        }
+    if (selectedTechnician == null) {
+      // Unassign the task
+      updateData = {
+        'status': 'Action Required',
+        'assignedTo': null,
+        'assignedToName': null,
+        'assignedBy': null,
+      };
+    } else {
+      // Fetch technician data (consider caching this data if it's accessed frequently)
+      QuerySnapshot technicianSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('name', isEqualTo: selectedTechnician)
+          .limit(1)
+          .get();
 
-        String technicianUid = technicianSnapshot.docs.first.id;
-
-        updateData = {
-          'status': 'Assigned',
-          'assignedTo': technicianUid,
-          'assignedToName': selectedTechnician,
-          'assignedBy': FirebaseAuth.instance.currentUser!.uid,
-        };
-
-        // Use NotificationService to send the notification
-        final notificationService =
-            Provider.of<NotificationService>(context, listen: false);
-        bool notificationSent =
-            await notificationService.sendTaskAssignmentNotification(
-          technicianUid,
-          data['ticketId'],
-          data['symptom'],
-        );
-
-        if (!notificationSent) {
-          print('Failed to send task assignment notification');
-        }
+      if (technicianSnapshot.docs.isEmpty) {
+        throw Exception('Technician not found');
       }
 
-      // Update the existing task in Firestore
-      await FirebaseFirestore.instance
-          .collection('tasks')
-          .doc(data['id'])
-          .update(updateData);
+      technicianUid = technicianSnapshot.docs.first.id;
 
-      // Use a callback to update the UI after the async operation is complete
-      if (mounted) {
-        setState(() {
-          // Update your local state here if necessary
-        });
-      }
+      updateData = {
+        'status': 'Assigned',
+        'assignedTo': technicianUid,
+        'assignedToName': selectedTechnician,
+        'assignedBy': FirebaseAuth.instance.currentUser!.uid,
+      };
+    }
 
-      // Show a snackbar outside of setState
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(selectedTechnician == null
-                    ? 'Task unassigned'
-                    : 'Task assigned to $selectedTechnician')),
-          );
-        }
+    // Add task update to batch
+    batch.update(taskRef, updateData);
+
+    // Commit the batch
+    await batch.commit();
+
+    // If a technician was assigned, send a notification
+    if (technicianUid != null) {
+      // Use a separate async call for notification to not block the UI
+      _sendNotificationToTechnician(technicianUid, data['ticketId'], data['symptom']);
+    }
+
+    // Update UI
+    if (mounted) {
+      setState(() {
+        // Update your local state here if necessary
       });
-    } catch (e) {
-      print('Error assigning/unassigning technician: $e');
-      // Show error message outside of setState
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to assign/unassign technician')),
-          );
-        }
-      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(selectedTechnician == null
+            ? 'Task unassigned'
+            : 'Task assigned to $selectedTechnician')),
+      );
+    }
+  } catch (e) {
+    print('Error assigning/unassigning technician: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to assign/unassign technician')),
+      );
     }
   }
+}
+
+// Separate method for sending notification
+Future<void> _sendNotificationToTechnician(String technicianUid, String ticketId, String symptom) async {
+  try {
+    final notificationService = Provider.of<NotificationService>(context, listen: false);
+    bool notificationSent = await notificationService.sendTaskAssignmentNotification(
+      technicianUid,
+      ticketId,
+      symptom,
+    );
+
+    if (!notificationSent) {
+      print('Failed to send task assignment notification');
+    }
+  } catch (e) {
+    print('Error sending notification: $e');
+  }
+}
 }
