@@ -190,74 +190,79 @@ class _ChatbotPageState extends State<ChatbotPage> {
       },
     );
   }
-
-  Widget _buildInputArea() {
-    if (_chatProvider.conversations.isEmpty) return Container();
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      color: Colors.grey[900],
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              onSubmitted: _sendMessage,
-              style: TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Type your message...',
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12),
+Widget _buildInputArea() {
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    color: Colors.grey[900],
+    child: Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            onSubmitted: _sendMessage,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Type your message...',
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              filled: true,
+              fillColor: Colors.grey[800],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
               ),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12),
             ),
           ),
-          SizedBox(width: 8),
-          IconButton(
-            icon: Icon(Icons.mic, color: _isListening ? Colors.red : Colors.white),
-            onPressed: _isListening ? _stopListening : _startListening,
-          ),
-          IconButton(
-            icon: Icon(Icons.send, color: Colors.white),
-            onPressed: () => _sendMessage(_controller.text),
-          ),
-        ],
+        ),
+        SizedBox(width: 8),
+        IconButton(
+          icon: Icon(Icons.mic, color: _isListening ? Colors.red : Colors.white),
+          onPressed: _isListening ? _stopListening : _startListening,
+        ),
+        IconButton(
+          icon: Icon(Icons.send, color: Colors.white),
+          onPressed: () => _sendMessage(_controller.text),
+        ),
+      ],
+    ),
+  );
+}
+Widget _buildMobileLayout() {
+  return Column(
+    children: [
+      Expanded(
+        child: _chatProvider.conversations.isEmpty
+            ? Center(child: Text("No conversations available.", style: TextStyle(color: Colors.black)))
+            : _buildChatList(),
       ),
-    );
-  }
+      _buildInputArea(),
+    ],
+  );
+}
 
-  Widget _buildMobileLayout() {
-    return Column(
-      children: [
-        Expanded(child: _buildChatList()),
-        _buildInputArea(),
-      ],
-    );
-  }
-
-  Widget _buildWebLayout() {
-    return Row(
-      children: [
-        Sidebar(
-          conversations: _chatProvider.chatTitles,
-          onConversationSelected: (index) => setState(() => selectedConversationIndex = index),
-          selectedConversationIndex: selectedConversationIndex,
+Widget _buildWebLayout() {
+  return Row(
+    children: [
+      Sidebar(
+        conversations: _chatProvider.chatTitles,
+        onConversationSelected: (index) => setState(() => selectedConversationIndex = index),
+        selectedConversationIndex: selectedConversationIndex,
+      ),
+      Expanded(
+        child: Column(
+          children: [
+            Expanded(
+              child: _chatProvider.conversations.isEmpty
+                  ? Center(child: Text("No conversations available.", style: TextStyle(color: Colors.black)))
+                  : _buildChatList(),
+            ),
+            _buildInputArea(),
+          ],
         ),
-        Expanded(
-          child: Column(
-            children: [
-              Expanded(child: _buildChatList()),
-              _buildInputArea(),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   @override
   Widget build(BuildContext context) {
