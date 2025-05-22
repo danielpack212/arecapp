@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-const String BASE_URL = 'http://192.168.204.255:5000';
+const String BASE_URL = 'http://192.168.204.10:5000';
 
 class ChatProvider extends ChangeNotifier {
   List<String> chatTitles = [];

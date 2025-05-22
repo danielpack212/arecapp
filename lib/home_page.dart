@@ -9,7 +9,7 @@ import 'sidebar.dart';
 import 'chat_provider.dart';
 import 'package:provider/provider.dart';
 
-const String BASE_URL = 'http://192.168.204.255:5000';
+const String BASE_URL = 'http://192.168.204.10:5000';
 
 class ChatbotPage extends StatefulWidget {
   const ChatbotPage({Key? key}) : super(key: key);
