@@ -193,12 +193,10 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   Widget _buildChatList() {
-    if (_chatProvider.conversations.isEmpty) {
-      return Container(); // Return an empty container when there are no chats
+    if (_chatProvider.conversations.isEmpty || selectedConversationIndex >= _chatProvider.conversations.length) {
+      return Center(child: Text("No conversations available.", style: TextStyle(color: Colors.black)));
     }
-    if (_chatProvider.conversations[selectedConversationIndex].isEmpty) {
-      return Center(child: Text('No messages in this chat yet.'));
-    }
+
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.all(8),
