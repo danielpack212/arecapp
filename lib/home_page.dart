@@ -37,8 +37,12 @@ class _ChatbotPageState extends State<ChatbotPage> {
   void initState() {
     super.initState();
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    _initializeChats();
   }
-
+  Future<void> _initializeChats() async {
+    await _chatProvider.initializeChatsFromFirestore();
+    setState(() {});
+  }
   bool isWebPlatform() => kIsWeb;
 
   Future<void> _sendMessage(String message) async {
