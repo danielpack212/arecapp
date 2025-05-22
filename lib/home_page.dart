@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io' show SocketException;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'sidebar.dart';
 import 'chat_provider.dart';
 import 'package:provider/provider.dart';
 
-const String BASE_URL = 'http://192.168.204.45:5000/';
+const String BASE_URL = 'http://192.168.204.255:5000';
 
 class ChatbotPage extends StatefulWidget {
   const ChatbotPage({Key? key}) : super(key: key);
@@ -45,7 +47,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
   bool isWebPlatform() => kIsWeb;
 
-  Future<void> _sendMessage(String message) async {
+   Future<void> _sendMessage(String message) async {
     if (message.trim().isEmpty || _chatProvider.conversations.isEmpty) return;
 
     if (_chatProvider.conversations.isEmpty) {
@@ -62,28 +64,49 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _scrollToBottom();
 
     try {
-      String ticketId = _chatProvider.chatTitles[selectedConversationIndex].split('#').last;
+      String ticketId = _chatProvider.chatTitles[selectedConversationIndex].split('#').last.trim();
       if (ticketId.isEmpty) throw Exception('Invalid ticketId');
+
+      final requestBody = jsonEncode({'text': message, 'ticketId': ticketId});
+      print('Sending request to: $BASE_URL/chat');
+      print('Request body: $requestBody');
 
       final response = await http.post(
         Uri.parse('$BASE_URL/chat'),
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: jsonEncode({'text': message, 'ticketId': ticketId}),
-      );
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Accept': 'application/json',
+        },
+        body: requestBody,
+      ).timeout(Duration(seconds: 30));
+
+      print('Response status code: ${response.statusCode}');
+      print('Response headers: ${response.headers}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
         _addMessage({'sender': 'bot', 'text': responseData['answer']});
       } else {
-        throw Exception('Failed to get response from server');
+        throw Exception('Server responded with status code: ${response.statusCode}. Body: ${response.body}');
       }
+    } on TimeoutException catch (_) {
+      print('Error in _sendMessage: Request timed out');
+      _addMessage({'sender': 'bot', 'text': 'Sorry, the server took too long to respond. Please try again.'});
+    } on SocketException catch (e) {
+      print('Error in _sendMessage: SocketException - $e');
+      _addMessage({'sender': 'bot', 'text': 'Sorry, there was a network error. Please check your internet connection and try again.'});
+    } on http.ClientException catch (e) {
+      print('Error in _sendMessage: ClientException - $e');
+      _addMessage({'sender': 'bot', 'text': 'Sorry, there was a problem with the request. Please try again later.'});
     } catch (e) {
       print('Error in _sendMessage: $e');
-      _addMessage({'sender': 'bot', 'text': 'Sorry, I encountered an error. Please try again later.'});
+      _addMessage({'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'});
     }
 
     _scrollToBottom();
   }
+
 
   void _addMessage(Map<String, String> message) {
     int index = _chatProvider.conversations[selectedConversationIndex].length;
