@@ -7,10 +7,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+
 class NotificationService {
   FirebaseMessaging messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Stream<RemoteMessage> get onMessage => FirebaseMessaging.onMessage;
 
@@ -113,22 +115,24 @@ class NotificationService {
       );
     }
   }
-Future<bool> sendTaskAssignmentNotification(String technicianUid, String ticketId, String taskDetails) async {
-  try {
-    print('Sending task assignment notification to technician: $technicianUid');
-    print('Ticket ID: $ticketId');
-    print('Task Details: $taskDetails');
 
+
+Future<bool> sendTaskAssignmentNotification(String technicianUid, String ticketId, String symptom) async {
+  final serverUrl = kIsWeb
+    ? 'http://localhost:3000/assign-task'  // Use your server's IP or domain for web
+    : 'http://10.0.2.2:3000/assign-task';  // Use this for Android emulator
+  print('Sending notification - Technician: $technicianUid, Task: $ticketId, Symptom: $symptom');
+
+  try {
     final response = await http.post(
-      Uri.parse('http://your-friends-ip-or-domain:3000/assign-task'),  // Replace with your friend's actual IP or domain
+      Uri.parse(serverUrl),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'technicianUid': technicianUid,
         'ticketId': ticketId,
-        'taskDetails': taskDetails,
+        'symptom': symptom,
       }),
     );
-
     print('Response status code: ${response.statusCode}');
     print('Response body: ${response.body}');
 
@@ -140,13 +144,23 @@ Future<bool> sendTaskAssignmentNotification(String technicianUid, String ticketI
       print('Response body: ${response.body}');
       return false;
     }
-  } on SocketException catch (e) {
-    print('🚨 SocketException while sending task assignment notification: ${e.message}');
-    print('This might be due to network connectivity issues or the server being unreachable.');
-    return false;
   } catch (e) {
     print('🚨 Error while sending task assignment notification: $e');
     return false;
   }
 }
+
+  Stream<QuerySnapshot> getNotificationsForTechnician(String technicianUid) {
+    return _firestore
+        .collection('notifications')
+        .where('technicianUid', isEqualTo: technicianUid)
+        .where('read', isEqualTo: false)
+        .snapshots();
+  }
+
+  Future<void> markNotificationAsRead(String notificationId) async {
+    await _firestore.collection('notifications').doc(notificationId).update({
+      'read': true,
+    });
+  }
 }

@@ -1613,6 +1613,7 @@ Future<void> _sendNotificationToTechnician(String technicianUid, String ticketId
     print('Symptom: $symptom');
 
     final notificationService = Provider.of<NotificationService>(context, listen: false);
+    
     bool notificationSent = await notificationService.sendTaskAssignmentNotification(
       technicianUid,
       ticketId,
