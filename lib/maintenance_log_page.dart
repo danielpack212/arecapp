@@ -1608,6 +1608,10 @@ Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechni
 // Separate method for sending notification
 Future<void> _sendNotificationToTechnician(String technicianUid, String ticketId, String symptom) async {
   try {
+    print('Attempting to send notification to technician: $technicianUid');
+    print('Ticket ID: $ticketId');
+    print('Symptom: $symptom');
+
     final notificationService = Provider.of<NotificationService>(context, listen: false);
     bool notificationSent = await notificationService.sendTaskAssignmentNotification(
       technicianUid,
@@ -1615,11 +1619,13 @@ Future<void> _sendNotificationToTechnician(String technicianUid, String ticketId
       symptom,
     );
 
-    if (!notificationSent) {
-      print('Failed to send task assignment notification');
+    if (notificationSent) {
+      print('✅ Task assignment notification sent successfully');
+    } else {
+      print('❌ Failed to send task assignment notification');
     }
   } catch (e) {
-    print('Error sending notification: $e');
+    print('🚨 Error sending notification: $e');
   }
 }
 }

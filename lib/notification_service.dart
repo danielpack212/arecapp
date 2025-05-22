@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
@@ -112,11 +113,14 @@ class NotificationService {
       );
     }
   }
-
- Future<bool> sendTaskAssignmentNotification(String technicianUid, String ticketId, String taskDetails) async {
+Future<bool> sendTaskAssignmentNotification(String technicianUid, String ticketId, String taskDetails) async {
   try {
+    print('Sending task assignment notification to technician: $technicianUid');
+    print('Ticket ID: $ticketId');
+    print('Task Details: $taskDetails');
+
     final response = await http.post(
-      Uri.parse('http://10.0.2.2:3000/assign-task'),  // Use your actual server URL
+      Uri.parse('http://your-friends-ip-or-domain:3000/assign-task'),  // Replace with your friend's actual IP or domain
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'technicianUid': technicianUid,
@@ -124,6 +128,9 @@ class NotificationService {
         'taskDetails': taskDetails,
       }),
     );
+
+    print('Response status code: ${response.statusCode}');
+    print('Response body: ${response.body}');
 
     if (response.statusCode == 200) {
       print('✅ Task assignment notification sent successfully');
@@ -133,8 +140,12 @@ class NotificationService {
       print('Response body: ${response.body}');
       return false;
     }
+  } on SocketException catch (e) {
+    print('🚨 SocketException while sending task assignment notification: ${e.message}');
+    print('This might be due to network connectivity issues or the server being unreachable.');
+    return false;
   } catch (e) {
-    print('🚨 HTTP error while sending task assignment notification: $e');
+    print('🚨 Error while sending task assignment notification: $e');
     return false;
   }
 }
