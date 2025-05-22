@@ -7,11 +7,11 @@ import 'sidebar.dart';
 import 'chat_provider.dart';
 import 'package:provider/provider.dart';
 
-
-const String BASE_URL =
-    'http://192.168.204.45:5000/'; // Replace with your new IP address
+const String BASE_URL = 'http://192.168.204.45:5000/';
 
 class ChatbotPage extends StatefulWidget {
+  const ChatbotPage({Key? key}) : super(key: key);
+
   @override
   _ChatbotPageState createState() => _ChatbotPageState();
 }
@@ -19,8 +19,14 @@ class ChatbotPage extends StatefulWidget {
 class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
   late ChatProvider _chatProvider;
+  int selectedConversationIndex = 0;
+  bool _isListening = false;
+  String _speechText = '';
+  final stt.SpeechToText _speech = stt.SpeechToText();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -33,96 +39,67 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
   }
 
-  int selectedConversationIndex = 0;
+  bool isWebPlatform() => kIsWeb;
 
-  bool _isListening = false;
-  String _speechText = '';
-  stt.SpeechToText _speech = stt.SpeechToText();
-
-  bool isWebPlatform() {
-    return kIsWeb;
-  }
-
-   void _sendMessage(String message) async {
+  Future<void> _sendMessage(String message) async {
     if (message.trim().isEmpty || _chatProvider.conversations.isEmpty) return;
 
-    // Check if there are any conversations
     if (_chatProvider.conversations.isEmpty) {
-      // If no conversations exist, create a new one
       await _chatProvider.addNewChat('New Chat', 'New Conversation');
-      setState(() {
-        selectedConversationIndex = 0;
-      });
+      setState(() => selectedConversationIndex = 0);
     }
 
-    // Ensure the selectedConversationIndex is valid
     if (selectedConversationIndex >= _chatProvider.conversations.length) {
-      setState(() {
-        selectedConversationIndex = _chatProvider.conversations.length - 1;
-      });
+      setState(() => selectedConversationIndex = _chatProvider.conversations.length - 1);
     }
 
-    setState(() {
-      _chatProvider.conversations[selectedConversationIndex]
-          .add({'sender': 'user', 'text': message});
-    });
-
+    _addMessage({'sender': 'user', 'text': message});
     _controller.clear();
     _scrollToBottom();
 
     try {
-      // Ensure we have a valid ticketId
-      String ticketId =
-          _chatProvider.chatTitles[selectedConversationIndex].split('#').last;
-      if (ticketId.isEmpty) {
-        throw Exception('Invalid ticketId');
-      }
+      String ticketId = _chatProvider.chatTitles[selectedConversationIndex].split('#').last;
+      if (ticketId.isEmpty) throw Exception('Invalid ticketId');
 
       final response = await http.post(
         Uri.parse('$BASE_URL/chat'),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, String>{
-          'text': message,
-          'ticketId': ticketId,
-        }),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({'text': message, 'ticketId': ticketId}),
       );
 
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
-        String botReply = responseData['answer'];
-
-        setState(() {
-          _chatProvider.conversations[selectedConversationIndex]
-              .add({'sender': 'bot', 'text': botReply});
-        });
+        _addMessage({'sender': 'bot', 'text': responseData['answer']});
       } else {
         throw Exception('Failed to get response from server');
       }
     } catch (e) {
       print('Error in _sendMessage: $e');
-      setState(() {
-        _chatProvider.conversations[selectedConversationIndex].add({
-          'sender': 'bot',
-          'text':
-              'Sorry, I encountered an error while processing your message. Please try again later.'
-        });
-      });
+      _addMessage({'sender': 'bot', 'text': 'Sorry, I encountered an error. Please try again later.'});
     }
 
     _scrollToBottom();
   }
 
+  void _addMessage(Map<String, String> message) {
+    int index = _chatProvider.conversations[selectedConversationIndex].length;
+    _chatProvider.conversations[selectedConversationIndex].add(message);
+    _listKey.currentState?.insertItem(index);
+  }
+
   void _scrollToBottom() {
     Future.delayed(Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
 
-  void _startListening() async {
+  Future<void> _startListening() async {
     if (!_isListening) {
       bool available = await _speech.initialize();
       if (available) {
@@ -131,48 +108,47 @@ class _ChatbotPageState extends State<ChatbotPage> {
           _speechText = '';
         });
 
-        _speech.listen(onResult: (result) {
-          setState(() {
+        _speech.listen(
+          onResult: (result) => setState(() {
             _speechText = result.recognizedWords;
             _controller.text = _speechText;
-          });
-        });
+          }),
+        );
       }
     }
   }
 
-  void _stopListening() async {
+  Future<void> _stopListening() async {
     await _speech.stop();
-    setState(() {
-      _isListening = false;
-    });
+    setState(() => _isListening = false);
   }
 
-  Widget _buildMessage(Map<String, String> message) {
+  Widget _buildMessage(Map<String, String> message, Animation<double> animation) {
     bool isUser = message['sender'] == 'user';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-        decoration: BoxDecoration(
-          color: isUser ? Colors.blue[100] : Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
+    return SizeTransition(
+      sizeFactor: animation,
+      child: Align(
+        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+          decoration: BoxDecoration(
+            color: isUser ? Colors.blue[100] : Colors.grey[200],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(message['text'] ?? ''),
         ),
-        child: Text(message['text'] ?? ''),
       ),
     );
   }
 
   Widget _buildDropdown() {
-    if (_chatProvider.chatTitles.isEmpty) {
-      return Container(); // Return an empty container if there are no chat titles
-    }
+    if (_chatProvider.chatTitles.isEmpty) return Container();
     return DropdownButton<int>(
       dropdownColor: Colors.grey[900],
       value: selectedConversationIndex < _chatProvider.chatTitles.length
           ? selectedConversationIndex
-          : 0, // Ensure the selected index is valid
+          : 0,
       icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
       onChanged: (int? newValue) {
         if (newValue != null && newValue < _chatProvider.chatTitles.length) {
@@ -193,25 +169,26 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   Widget _buildChatList() {
-    if (_chatProvider.conversations.isEmpty || selectedConversationIndex >= _chatProvider.conversations.length) {
+    if (_chatProvider.conversations.isEmpty ||
+        selectedConversationIndex >= _chatProvider.conversations.length) {
       return Center(child: Text("No conversations available.", style: TextStyle(color: Colors.black)));
     }
 
-    return ListView.builder(
+    return AnimatedList(
+      key: _listKey,
       controller: _scrollController,
-      padding: EdgeInsets.all(8),
-      itemCount: _chatProvider.conversations[selectedConversationIndex].length,
-      itemBuilder: (context, index) {
+      initialItemCount: _chatProvider.conversations[selectedConversationIndex].length,
+      itemBuilder: (context, index, animation) {
         return _buildMessage(
-            _chatProvider.conversations[selectedConversationIndex][index]);
+          _chatProvider.conversations[selectedConversationIndex][index],
+          animation,
+        );
       },
     );
   }
 
   Widget _buildInputArea() {
-    if (_chatProvider.conversations.isEmpty) {
-      return Container(); // Hide input area when there are no chats
-    }
+    if (_chatProvider.conversations.isEmpty) return Container();
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       color: Colors.grey[900],
@@ -220,7 +197,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
           Expanded(
             child: TextField(
               controller: _controller,
-              onSubmitted: (value) => _sendMessage(value),
+              onSubmitted: _sendMessage,
               style: TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Type your message...',
@@ -237,15 +214,8 @@ class _ChatbotPageState extends State<ChatbotPage> {
           ),
           SizedBox(width: 8),
           IconButton(
-            icon: Icon(Icons.mic,
-                color: _isListening ? Colors.red : Colors.white),
-            onPressed: () {
-              if (_isListening) {
-                _stopListening();
-              } else {
-                _startListening();
-              }
-            },
+            icon: Icon(Icons.mic, color: _isListening ? Colors.red : Colors.white),
+            onPressed: _isListening ? _stopListening : _startListening,
           ),
           IconButton(
             icon: Icon(Icons.send, color: Colors.white),
@@ -259,9 +229,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
   Widget _buildMobileLayout() {
     return Column(
       children: [
-        Expanded(
-          child: _buildChatList(),
-        ),
+        Expanded(child: _buildChatList()),
         _buildInputArea(),
       ],
     );
@@ -272,19 +240,13 @@ class _ChatbotPageState extends State<ChatbotPage> {
       children: [
         Sidebar(
           conversations: _chatProvider.chatTitles,
-          onConversationSelected: (index) {
-            setState(() {
-              selectedConversationIndex = index;
-            });
-          },
+          onConversationSelected: (index) => setState(() => selectedConversationIndex = index),
           selectedConversationIndex: selectedConversationIndex,
         ),
         Expanded(
           child: Column(
             children: [
-              Expanded(
-                child: _buildChatList(),
-              ),
+              Expanded(child: _buildChatList()),
               _buildInputArea(),
             ],
           ),
@@ -293,23 +255,18 @@ class _ChatbotPageState extends State<ChatbotPage> {
     );
   }
 
-@override
-Widget build(BuildContext context) {
-  bool isWeb = isWebPlatform();
-
-  Widget body;
-    body = isWeb ? _buildWebLayout() : _buildMobileLayout();
-
-  return Scaffold(
-    appBar: isWeb 
-      ? null
-      : AppBar(
-          title: Text('Chatbot', style: TextStyle(color: Colors.white)),
-          backgroundColor: Colors.grey[900],
-          actions: _chatProvider.conversations.isEmpty ? [] : [_buildDropdown()],
-        ),
-    body: body,
-    resizeToAvoidBottomInset: true,
-  );
-}
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: isWebPlatform()
+          ? null
+          : AppBar(
+              title: Text('Chatbot', style: TextStyle(color: Colors.white)),
+              backgroundColor: Colors.grey[900],
+              actions: _chatProvider.conversations.isEmpty ? [] : [_buildDropdown()],
+            ),
+      body: isWebPlatform() ? _buildWebLayout() : _buildMobileLayout(),
+      resizeToAvoidBottomInset: true,
+    );
+  }
 }
