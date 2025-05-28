@@ -4,12 +4,8 @@ import 'package:provider/provider.dart';
 import 'user_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:provider/provider.dart';
 import 'chat_provider.dart'; // Make sure you've created this file
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'notification_service.dart';
-import 'chat_provider.dart';
 import 'dart:async';
 
 class MaintenanceLogPage extends StatefulWidget {
@@ -122,26 +118,31 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
     },
   ];
 
-  void listenForNewTasks() {
-    FirebaseFirestore.instance
-        .collection('tasks')
-        .snapshots()
-        .listen((snapshot) {
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          var newTask = change.doc.data() as Map<String, dynamic>;
-          String ticketId = newTask['ticketId'];
-          String symptom = newTask['Symptom'];
+void _listenForNewTasks() {
+  final userRole = Provider.of<UserProvider>(context, listen: false).userRole;
+  final userId = FirebaseAuth.instance.currentUser!.uid;
 
-          // Check if a chat for this ticket already exists
-          if (!Provider.of<ChatProvider>(context, listen: false)
-              .chatExists(ticketId)) {
-            createNewChatTab(ticketId,symptom);
-          }
+  Query query = FirebaseFirestore.instance.collection('tasks');
+  
+  if (userRole == 'Maintenance Technician') {
+    query = query.where('assignedTo', isEqualTo: userId);
+  } else {
+    // For Energy Experts, listen for all new tasks that are not resolved
+    query = query.where('status', isNotEqualTo: 'Resolved');
+  }
+
+  _taskSubscription = query.snapshots().listen((snapshot) {
+    for (var change in snapshot.docChanges) {
+      if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
+        String ticketId = change.doc['ticketId'];
+        String symptom = change.doc['symptom'] ?? 'Unknown issue';
+        if (!_chatProvider.chatExists(ticketId)) {
+          _chatProvider.addNewChat(ticketId, symptom);
         }
       }
-    });
-  }
+    }
+  });
+}
 
   late ChatProvider _chatProvider;
   late StreamSubscription<QuerySnapshot> _taskSubscription;
@@ -151,45 +152,37 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   void initState() {
     super.initState();
     initializeFirestoreWithDummyData();
-    listenForNewTasks();
     WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
     _initializeChatsFromFirestore();
     _listenForNewTasks();
   }
 
-  void _initializeChatsFromFirestore() async {
-    QuerySnapshot snapshot = await FirebaseFirestore.instance
-        .collection('tasks')
-        .where('status', isEqualTo: 'Action Required')
-        .get();
+void _initializeChatsFromFirestore() async {
+  final userRole = Provider.of<UserProvider>(context, listen: false).userRole;
+  final userId = FirebaseAuth.instance.currentUser!.uid;
 
-    for (var doc in snapshot.docs) {
-      String ticketId = doc.id;
-      String symptom = doc['symptom'] ?? 'Unknown issue';
-      if (!_chatProvider.chatExists(ticketId)) {
-        await _chatProvider.addNewChat(ticketId, symptom);
-      }
+  Query query = FirebaseFirestore.instance.collection('tasks');
+
+  if (userRole == 'Maintenance Technician') {
+    query = query.where('assignedTo', isEqualTo: userId);
+  } else {
+    // For Energy Experts, show all tasks that are not resolved
+    query = query.where('status', isNotEqualTo: 'Resolved');
+  }
+
+  QuerySnapshot snapshot = await query.get();
+
+  for (var doc in snapshot.docs) {
+    String ticketId = doc['ticketId'];
+    String symptom = doc['symptom'] ?? 'Unknown issue';
+    if (!_chatProvider.chatExists(ticketId)) {
+      await _chatProvider.addNewChat(ticketId, symptom);
     }
   }
+}
 
-  void _listenForNewTasks() {
-    _taskSubscription = FirebaseFirestore.instance
-        .collection('tasks')
-        .where('status', isEqualTo: 'Action Required')
-        .snapshots()
-        .listen((snapshot) {
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          String ticketId = change.doc.id;
-          String symptom = change.doc['symptom'] ?? 'Unknown issue';
-          if (!_chatProvider.chatExists(ticketId)) {
-            _chatProvider.addNewChat(ticketId, symptom);
-          }
-        }
-      }
-    });
-  }
 
   @override
   void dispose() {
@@ -1577,10 +1570,14 @@ Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechni
     // Commit the batch
     await batch.commit();
 
-    // If a technician was assigned, send a notification
+    // If a technician was assigned, send a notification and create a chat
     if (technicianUid != null) {
       // Use a separate async call for notification to not block the UI
       _sendNotificationToTechnician(technicianUid, data['ticketId'], data['symptom']);
+      
+      // Create a new chat for the assigned technician
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      await chatProvider.addNewChat(data['ticketId'], data['symptom']);
     }
 
     // Update UI

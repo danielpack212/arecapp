@@ -8,6 +8,8 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'sidebar.dart';
 import 'chat_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'user_provider.dart';
 
 const String BASE_URL = 'http://192.168.204.10:5000';
 
@@ -35,19 +37,24 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    _initializeChats();
-  }
-  Future<void> _initializeChats() async {
-    await _chatProvider.initializeChatsFromFirestore();
+@override
+void initState() {
+  super.initState();
+  _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  _initializeChats(userProvider.userRole, userProvider.userId);
+}
+
+Future<void> _initializeChats(String userRole, String userId) async {
+  await _chatProvider.initializeChatsFromFirestore(userRole, userId);
+  if (mounted) {
     setState(() {});
   }
+}
+
   bool isWebPlatform() => kIsWeb;
 
-   Future<void> _sendMessage(String message) async {
+  Future<void> _sendMessage(String message) async {
     if (message.trim().isEmpty || _chatProvider.conversations.isEmpty) return;
 
     if (_chatProvider.conversations.isEmpty) {
@@ -56,7 +63,8 @@ class _ChatbotPageState extends State<ChatbotPage> {
     }
 
     if (selectedConversationIndex >= _chatProvider.conversations.length) {
-      setState(() => selectedConversationIndex = _chatProvider.conversations.length - 1);
+      setState(() =>
+          selectedConversationIndex = _chatProvider.conversations.length - 1);
     }
 
     _addMessage({'sender': 'user', 'text': message});
@@ -64,21 +72,26 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _scrollToBottom();
 
     try {
-      String ticketId = _chatProvider.chatTitles[selectedConversationIndex].split('#').last.trim();
+      String ticketId = _chatProvider.chatTitles[selectedConversationIndex]
+          .split('#')
+          .last
+          .trim();
       if (ticketId.isEmpty) throw Exception('Invalid ticketId');
 
       final requestBody = jsonEncode({'text': message, 'ticketId': ticketId});
       print('Sending request to: $BASE_URL/chat');
       print('Request body: $requestBody');
 
-      final response = await http.post(
-        Uri.parse('$BASE_URL/chat'),
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Accept': 'application/json',
-        },
-        body: requestBody,
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .post(
+            Uri.parse('$BASE_URL/chat'),
+            headers: {
+              'Content-Type': 'application/json; charset=UTF-8',
+              'Accept': 'application/json',
+            },
+            body: requestBody,
+          )
+          .timeout(Duration(seconds: 30));
 
       print('Response status code: ${response.statusCode}');
       print('Response headers: ${response.headers}');
@@ -88,25 +101,37 @@ class _ChatbotPageState extends State<ChatbotPage> {
         var responseData = jsonDecode(response.body);
         _addMessage({'sender': 'bot', 'text': responseData['answer']});
       } else {
-        throw Exception('Server responded with status code: ${response.statusCode}. Body: ${response.body}');
+        throw Exception(
+            'Server responded with status code: ${response.statusCode}. Body: ${response.body}');
       }
     } on TimeoutException catch (_) {
       print('Error in _sendMessage: Request timed out');
-      _addMessage({'sender': 'bot', 'text': 'Sorry, the server took too long to respond. Please try again.'});
+      _addMessage({
+        'sender': 'bot',
+        'text': 'Sorry, the server took too long to respond. Please try again.'
+      });
     } on SocketException catch (e) {
       print('Error in _sendMessage: SocketException - $e');
-      _addMessage({'sender': 'bot', 'text': 'Sorry, there was a network error. Please check your internet connection and try again.'});
+      _addMessage({
+        'sender': 'bot',
+        'text':
+            'Sorry, there was a network error. Please check your internet connection and try again.'
+      });
     } on http.ClientException catch (e) {
       print('Error in _sendMessage: ClientException - $e');
-      _addMessage({'sender': 'bot', 'text': 'Sorry, there was a problem with the request. Please try again later.'});
+      _addMessage({
+        'sender': 'bot',
+        'text':
+            'Sorry, there was a problem with the request. Please try again later.'
+      });
     } catch (e) {
       print('Error in _sendMessage: $e');
-      _addMessage({'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'});
+      _addMessage(
+          {'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'});
     }
 
     _scrollToBottom();
   }
-
 
   void _addMessage(Map<String, String> message) {
     int index = _chatProvider.conversations[selectedConversationIndex].length;
@@ -150,7 +175,8 @@ class _ChatbotPageState extends State<ChatbotPage> {
     setState(() => _isListening = false);
   }
 
-  Widget _buildMessage(Map<String, String> message, Animation<double> animation) {
+  Widget _buildMessage(
+      Map<String, String> message, Animation<double> animation) {
     bool isUser = message['sender'] == 'user';
     return SizeTransition(
       sizeFactor: animation,
@@ -163,7 +189,14 @@ class _ChatbotPageState extends State<ChatbotPage> {
             color: isUser ? Colors.blue[100] : Colors.grey[200],
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(message['text'] ?? ''),
+          child: MarkdownBody(
+            data: message['text'] ?? '',
+            selectable: true,
+            styleSheet:
+                MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+              p: TextStyle(fontSize: 16.0),
+            ),
+          ),
         ),
       ),
     );
@@ -198,13 +231,16 @@ class _ChatbotPageState extends State<ChatbotPage> {
   Widget _buildChatList() {
     if (_chatProvider.conversations.isEmpty ||
         selectedConversationIndex >= _chatProvider.conversations.length) {
-      return Center(child: Text("No conversations available.", style: TextStyle(color: Colors.black)));
+      return Center(
+          child: Text("No conversations available.",
+              style: TextStyle(color: Colors.black)));
     }
 
     return AnimatedList(
       key: _listKey,
       controller: _scrollController,
-      initialItemCount: _chatProvider.conversations[selectedConversationIndex].length,
+      initialItemCount:
+          _chatProvider.conversations[selectedConversationIndex].length,
       itemBuilder: (context, index, animation) {
         return _buildMessage(
           _chatProvider.conversations[selectedConversationIndex][index],
@@ -213,79 +249,87 @@ class _ChatbotPageState extends State<ChatbotPage> {
       },
     );
   }
-Widget _buildInputArea() {
-  return Container(
-    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    color: Colors.grey[900],
-    child: Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _controller,
-            onSubmitted: _sendMessage,
-            style: TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              hintText: 'Type your message...',
-              hintStyle: TextStyle(color: Colors.grey[400]),
-              filled: true,
-              fillColor: Colors.grey[800],
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+
+  Widget _buildInputArea() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      color: Colors.grey[900],
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              onSubmitted: _sendMessage,
+              style: TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Type your message...',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                filled: true,
+                fillColor: Colors.grey[800],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12),
               ),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12),
             ),
           ),
+          SizedBox(width: 8),
+          IconButton(
+            icon: Icon(Icons.mic,
+                color: _isListening ? Colors.red : Colors.white),
+            onPressed: _isListening ? _stopListening : _startListening,
+          ),
+          IconButton(
+            icon: Icon(Icons.send, color: Colors.white),
+            onPressed: () => _sendMessage(_controller.text),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        Expanded(
+          child: _chatProvider.conversations.isEmpty
+              ? Center(
+                  child: Text("No conversations available.",
+                      style: TextStyle(color: Colors.black)))
+              : _buildChatList(),
         ),
-        SizedBox(width: 8),
-        IconButton(
-          icon: Icon(Icons.mic, color: _isListening ? Colors.red : Colors.white),
-          onPressed: _isListening ? _stopListening : _startListening,
+        _buildInputArea(),
+      ],
+    );
+  }
+
+  Widget _buildWebLayout() {
+    return Row(
+      children: [
+        Sidebar(
+          conversations: _chatProvider.chatTitles,
+          onConversationSelected: (index) =>
+              setState(() => selectedConversationIndex = index),
+          selectedConversationIndex: selectedConversationIndex,
         ),
-        IconButton(
-          icon: Icon(Icons.send, color: Colors.white),
-          onPressed: () => _sendMessage(_controller.text),
+        Expanded(
+          child: Column(
+            children: [
+              Expanded(
+                child: _chatProvider.conversations.isEmpty
+                    ? Center(
+                        child: Text("No conversations available.",
+                            style: TextStyle(color: Colors.black)))
+                    : _buildChatList(),
+              ),
+              _buildInputArea(),
+            ],
+          ),
         ),
       ],
-    ),
-  );
-}
-Widget _buildMobileLayout() {
-  return Column(
-    children: [
-      Expanded(
-        child: _chatProvider.conversations.isEmpty
-            ? Center(child: Text("No conversations available.", style: TextStyle(color: Colors.black)))
-            : _buildChatList(),
-      ),
-      _buildInputArea(),
-    ],
-  );
-}
-
-Widget _buildWebLayout() {
-  return Row(
-    children: [
-      Sidebar(
-        conversations: _chatProvider.chatTitles,
-        onConversationSelected: (index) => setState(() => selectedConversationIndex = index),
-        selectedConversationIndex: selectedConversationIndex,
-      ),
-      Expanded(
-        child: Column(
-          children: [
-            Expanded(
-              child: _chatProvider.conversations.isEmpty
-                  ? Center(child: Text("No conversations available.", style: TextStyle(color: Colors.black)))
-                  : _buildChatList(),
-            ),
-            _buildInputArea(),
-          ],
-        ),
-      ),
-    ],
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -295,7 +339,8 @@ Widget _buildWebLayout() {
           : AppBar(
               title: Text('Chatbot', style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.grey[900],
-              actions: _chatProvider.conversations.isEmpty ? [] : [_buildDropdown()],
+              actions:
+                  _chatProvider.conversations.isEmpty ? [] : [_buildDropdown()],
             ),
       body: isWebPlatform() ? _buildWebLayout() : _buildMobileLayout(),
       resizeToAvoidBottomInset: true,

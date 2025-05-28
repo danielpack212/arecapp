@@ -3,17 +3,24 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserProvider extends ChangeNotifier {
-  String? _userRole;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String _userRole = '';
+  String _userId = '';
 
-  String? get userRole => _userRole;
+  String get userRole => _userRole;
+  String get userId => _userId;
 
   Future<void> fetchUserRole() async {
-    User? user = _auth.currentUser;
+    User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
-      _userRole = userDoc.get('role') as String?;
+      _userId = user.uid;
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        _userRole = userDoc['role'] ?? '';
+      }
       notifyListeners();
     }
   }
