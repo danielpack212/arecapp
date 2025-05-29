@@ -235,7 +235,7 @@ class _MainNavigationState extends State<MainNavigation> {
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Study Abroad', style: TextStyle(color: Colors.white)),
+              Text('TuneUp', style: TextStyle(color: Colors.white)),
               Row(
                 children: [
                   TextButton(

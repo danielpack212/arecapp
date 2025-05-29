@@ -974,14 +974,17 @@ void _initializeChatsFromFirestore() async {
     );
   }
 
-  Widget _buildCreateNewTaskButton(BuildContext context) {
-    return FloatingActionButton(
-      child: Icon(Icons.add),
+Widget _buildCreateNewTaskButton(BuildContext context) {
+  return Container(
+    width: 200, // Set a suitable width
+    child: ElevatedButton(
       onPressed: () {
         showCreateTaskDialog(context, context.read<UserProvider>().userRole);
       },
-    );
-  }
+      child: Text('Create New Task'),
+    ),
+  );
+}
 
   void showCreateTaskDialog(BuildContext context, String? userRole) {
     String symptom = '';
