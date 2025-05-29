@@ -1276,7 +1276,6 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
     return '';
   }
 
-
 void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
   final userRole = context.read<UserProvider>().userRole;
 
@@ -1285,140 +1284,29 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
     builder: (BuildContext context) {
       return Dialog(
         backgroundColor: Colors.transparent,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.8,
-          height: MediaQuery.of(context).size.height * 0.9,
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.8,
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      '${data['symptom']}',
-                      style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text('${data['location']}',
-                        style: TextStyle(color: Colors.black)),
-                  ),
-                  Expanded(
-                    child: Text('Status: ${data['status']}',
-                        style: TextStyle(color: Colors.black)),
-                  ),
-                  Expanded(
-                    child: Text('Ticket #${data['ticketId']}',
-                        style: TextStyle(color: Colors.black)),
-                  ),
-                  Expanded(
-                    child: Text('Opened ${data['dateOpened']}',
-                        style: TextStyle(color: Colors.black)),
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (kIsWeb && data['imageUrl'] != null)
-                        Container(
-                          width: double.infinity,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              data['imageUrl'],
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Center(child: Text('Failed to load image'));
-                              },
-                            ),
-                          ),
-                        ),
-                      if (kIsWeb && data['imageUrl'] != null) SizedBox(height: 16),
-                      _buildDetailSection(
-                          'Classification', [data['classification'] ?? 'N/A'],
-                          isWide: true),
-                      SizedBox(height: 16),
-                      if (data['description'] != null &&
-                          data['description'].isNotEmpty)
-                        _buildDetailSection(
-                            'Description', [data['description']],
-                            isWide: true),
-                      SizedBox(height: 16),
-                      if (data['subSymptoms'] != null &&
-                          (data['subSymptoms'] as List).isNotEmpty)
-                        _buildDetailSection(
-                            'Sub-symptoms',
-                            (data['subSymptoms'] as List)
-                                .map<String>((subSymptom) =>
-                                    '${subSymptom['name']}: ${subSymptom['percentage']}%')
-                                .toList(),
-                            isWide: true),
-                      SizedBox(height: 16),
-                      _buildDetailSection('Assigned To',
-                          [data['assignedToName'] ?? 'Unassigned'],
-                          isWide: true),
-                      SizedBox(height: 16),
-                      FutureBuilder<List<String>>(
-                        future: _fetchTechniciansForBuilding(data['location']),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return CircularProgressIndicator();
-                          } else if (snapshot.hasError) {
-                            return Text('Error: ${snapshot.error}');
-                          } else if (!snapshot.hasData ||
-                              snapshot.data!.isEmpty) {
-                            return Text('No technicians available');
-                          } else {
-                            return _buildDetailSection(
-                                'Available Technicians', snapshot.data!,
-                                isWide: true);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+          child: Container(
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeaderRow(data),
+                SizedBox(height: 24),
+                Expanded(
+                  child: _buildScrollableContent(data, context),
                 ),
-              ),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (userRole == 'Energy Expert')
-                    ElevatedButton(
-                      child: Text('Assign Technician'),
-                      onPressed: () =>
-                          _showAssignTechnicianDialog(context, data),
-                    ),
-                  ElevatedButton(
-                    child: Text('Close Ticket Summary'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
-              ),
-            ],
+                SizedBox(height: 24),
+                _buildActionButtons(context, data, userRole),
+              ],
+            ),
           ),
         ),
       );
@@ -1426,38 +1314,150 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
   );
 }
 
-  Widget _buildDetailSection(String title, List<String> items,
-      {bool isWide = false}) {
-    return Container(
-      width: isWide ? double.infinity : null,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
-        borderRadius: BorderRadius.circular(8),
+Widget _buildHeaderRow(Map<String, dynamic> data) {
+  return Row(
+    children: [
+      Expanded(
+        flex: 2,
+        child: Text(
+          '${data['symptom']}',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
-      padding: EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-            textAlign: TextAlign.center,
+      Expanded(child: Text('${data['location']}')),
+      Expanded(child: Text('Status: ${data['status']}')),
+      Expanded(child: Text('Ticket #${data['ticketId']}')),
+      Expanded(child: Text('Opened ${data['dateOpened']}')),
+    ],
+  );
+}
+
+Widget _buildScrollableContent(Map<String, dynamic> data, BuildContext context) {
+  return SingleChildScrollView(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (kIsWeb && data['imageUrl'] != null) _buildImageWidget(data['imageUrl']),
+        SizedBox(height: 16),
+        _buildDetailSection('Classification', [data['classification'] ?? 'N/A']),
+        if (data['description'] != null && data['description'].isNotEmpty)
+          _buildDetailSection('Description', [data['description']]),
+        if (data['subSymptoms'] != null && (data['subSymptoms'] as List).isNotEmpty)
+          _buildDetailSection(
+            'Sub-symptoms',
+            (data['subSymptoms'] as List).map<String>((subSymptom) => 
+              '${subSymptom['name']}: ${subSymptom['percentage']}%'
+            ).toList(),
           ),
-          SizedBox(height: 8),
-          ...items
-              .map((item) => Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      item,
-                      style: TextStyle(color: Colors.black),
-                      textAlign: TextAlign.center,
-                    ),
-                  ))
-              .toList(),
+        _buildDetailSection('Assigned To', [data['assignedToName'] ?? 'Unassigned']),
+        _buildAvailableTechnicians(data['location']),
+      ].map((widget) => Padding(
+        padding: EdgeInsets.only(bottom: 16),
+        child: widget,
+      )).toList(),
+    ),
+  );
+}
+
+Widget _buildImageWidget(String imageUrl) {
+  return Center(
+    child: Container(
+      constraints: BoxConstraints(
+        maxWidth: 400, // Adjust this value as needed
+        maxHeight: 250, // Adjust this value as needed
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.5),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
-    );
-  }
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Center(child: Text('Failed to load image'));
+          },
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildDetailSection(String title, List<String> items, {bool isWide = true}) {
+  return Container(
+    width: isWide ? double.infinity : null,
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      border: Border.all(color: Colors.grey),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 8),
+        ...items.map((item) => Padding(
+          padding: EdgeInsets.only(bottom: 4),
+          child: Text(
+            item,
+            style: TextStyle(color: Colors.black),
+            textAlign: isWide ? TextAlign.center : TextAlign.left,
+          ),
+        )).toList(),
+      ],
+    ),
+  );
+}
+
+Widget _buildAvailableTechnicians(String location) {
+  return FutureBuilder<List<String>>(
+    future: _fetchTechniciansForBuilding(location),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return CircularProgressIndicator();
+      } else if (snapshot.hasError) {
+        return Text('Error: ${snapshot.error}');
+      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+        return Text('No technicians available');
+      } else {
+        return _buildDetailSection('Available Technicians', snapshot.data!);
+      }
+    },
+  );
+}
+
+Widget _buildActionButtons(BuildContext context, Map<String, dynamic> data, String userRole) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.end,
+    children: [
+      if (userRole == 'Energy Expert')
+        ElevatedButton(
+          child: Text('Assign Technician'),
+          onPressed: () => _showAssignTechnicianDialog(context, data),
+        ),
+      SizedBox(width: 16),
+      ElevatedButton(
+        child: Text('Close Ticket Summary'),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+    ],
+  );
+}
+
+
 
   Future<List<String>> _fetchTechniciansForBuilding(String building) async {
     QuerySnapshot snapshot = await FirebaseFirestore.instance

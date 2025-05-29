@@ -34,6 +34,7 @@ class _SignUpPageState extends State<SignUpPage> {
         'phone': _phoneController.text.trim(),
         'role': _selectedRole,
         'email': _emailController.text.trim(),
+        'fcmToken': 'uninitialized',
       };
 
       if (_selectedRole == 'Maintenance Technician') {
