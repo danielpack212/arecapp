@@ -55,83 +55,65 @@ Future<void> _initializeChats(String userRole, String userId) async {
   bool isWebPlatform() => kIsWeb;
 
   Future<void> _sendMessage(String message) async {
-    if (message.trim().isEmpty || _chatProvider.conversations.isEmpty) return;
+  if (message.trim().isEmpty) return;
 
+  setState(() {
     if (_chatProvider.conversations.isEmpty) {
-      await _chatProvider.addNewChat('New Chat', 'New Conversation');
-      setState(() => selectedConversationIndex = 0);
+      _chatProvider.conversations.add([]);
+      selectedConversationIndex = 0;
     }
 
+    // Ensure we're working with the correct conversation
     if (selectedConversationIndex >= _chatProvider.conversations.length) {
-      setState(() =>
-          selectedConversationIndex = _chatProvider.conversations.length - 1);
+      selectedConversationIndex = _chatProvider.conversations.length - 1;
     }
 
-    _addMessage({'sender': 'user', 'text': message});
-    _controller.clear();
-    _scrollToBottom();
+    // Add the user's message to the current conversation
+    _chatProvider.conversations[selectedConversationIndex].add({'sender': 'user', 'text': message});
+  });
 
-    try {
-      String ticketId = _chatProvider.chatTitles[selectedConversationIndex]
-          .split('#')
-          .last
-          .trim();
-      if (ticketId.isEmpty) throw Exception('Invalid ticketId');
+  _controller.clear();
+  _scrollToBottom();
 
-      final requestBody = jsonEncode({'text': message, 'ticketId': ticketId});
-      print('Sending request to: $BASE_URL/chat');
-      print('Request body: $requestBody');
+  try {
+    String ticketId = _chatProvider.chatTitles[selectedConversationIndex].split('#').last.trim();
+    if (ticketId.isEmpty) throw Exception('Invalid ticketId');
 
-      final response = await http
-          .post(
-            Uri.parse('$BASE_URL/chat'),
-            headers: {
-              'Content-Type': 'application/json; charset=UTF-8',
-              'Accept': 'application/json',
-            },
-            body: requestBody,
-          )
-          .timeout(Duration(seconds: 30));
+    final requestBody = jsonEncode({'text': message, 'ticketId': ticketId});
+    print('Sending request to: $BASE_URL/chat');
+    print('Request body: $requestBody');
 
-      print('Response status code: ${response.statusCode}');
-      print('Response headers: ${response.headers}');
-      print('Response body: ${response.body}');
+    final response = await http.post(
+      Uri.parse('$BASE_URL/chat'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+      },
+      body: requestBody,
+    ).timeout(Duration(seconds: 30));
 
-      if (response.statusCode == 200) {
-        var responseData = jsonDecode(response.body);
-        _addMessage({'sender': 'bot', 'text': responseData['answer']});
-      } else {
-        throw Exception(
-            'Server responded with status code: ${response.statusCode}. Body: ${response.body}');
-      }
-    } on TimeoutException catch (_) {
-      print('Error in _sendMessage: Request timed out');
-      _addMessage({
-        'sender': 'bot',
-        'text': 'Sorry, the server took too long to respond. Please try again.'
+    print('Response status code: ${response.statusCode}');
+    print('Response headers: ${response.headers}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      var responseData = jsonDecode(response.body);
+      setState(() {
+        _chatProvider.conversations[selectedConversationIndex].add({'sender': 'bot', 'text': responseData['answer']});
       });
-    } on SocketException catch (e) {
-      print('Error in _sendMessage: SocketException - $e');
-      _addMessage({
-        'sender': 'bot',
-        'text':
-            'Sorry, there was a network error. Please check your internet connection and try again.'
-      });
-    } on http.ClientException catch (e) {
-      print('Error in _sendMessage: ClientException - $e');
-      _addMessage({
-        'sender': 'bot',
-        'text':
-            'Sorry, there was a problem with the request. Please try again later.'
-      });
-    } catch (e) {
-      print('Error in _sendMessage: $e');
-      _addMessage(
-          {'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'});
+    } else {
+      throw Exception('Server responded with status code: ${response.statusCode}. Body: ${response.body}');
     }
-
-    _scrollToBottom();
+  } catch (e) {
+    print('Error in _sendMessage: $e');
+    setState(() {
+      _chatProvider.conversations[selectedConversationIndex].add({'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'});
+    });
   }
+
+  _scrollToBottom();
+  _chatProvider.notifyListeners();
+}
 
   void _addMessage(Map<String, String> message) {
     int index = _chatProvider.conversations[selectedConversationIndex].length;
@@ -175,33 +157,27 @@ Future<void> _initializeChats(String userRole, String userId) async {
     setState(() => _isListening = false);
   }
 
-  Widget _buildMessage(
-      Map<String, String> message, Animation<double> animation) {
-    bool isUser = message['sender'] == 'user';
-    return SizeTransition(
-      sizeFactor: animation,
-      child: Align(
-        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-          decoration: BoxDecoration(
-            color: isUser ? Colors.blue[100] : Colors.grey[200],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: MarkdownBody(
-            data: message['text'] ?? '',
-            selectable: true,
-            styleSheet:
-                MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-              p: TextStyle(fontSize: 16.0),
-            ),
-          ),
+  Widget _buildMessage(Map<String, String> message) {
+  bool isUser = message['sender'] == 'user';
+  return Align(
+    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+    child: Container(
+      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+      decoration: BoxDecoration(
+        color: isUser ? Colors.blue[100] : Colors.grey[200],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: MarkdownBody(
+        data: message['text'] ?? '',
+        selectable: true,
+        styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+          p: TextStyle(fontSize: 16.0),
         ),
       ),
-    );
-  }
-
+    ),
+  );
+}
   Widget _buildDropdown() {
     if (_chatProvider.chatTitles.isEmpty) return Container();
     return DropdownButton<int>(
@@ -229,26 +205,29 @@ Future<void> _initializeChats(String userRole, String userId) async {
   }
 
   Widget _buildChatList() {
-    if (_chatProvider.conversations.isEmpty ||
-        selectedConversationIndex >= _chatProvider.conversations.length) {
-      return Center(
+  return Consumer<ChatProvider>(
+    builder: (context, chatProvider, child) {
+      if (chatProvider.conversations.isEmpty ||
+          selectedConversationIndex >= chatProvider.conversations.length) {
+        return Center(
           child: Text("No conversations available.",
-              style: TextStyle(color: Colors.black)));
-    }
-
-    return AnimatedList(
-      key: _listKey,
-      controller: _scrollController,
-      initialItemCount:
-          _chatProvider.conversations[selectedConversationIndex].length,
-      itemBuilder: (context, index, animation) {
-        return _buildMessage(
-          _chatProvider.conversations[selectedConversationIndex][index],
-          animation,
+              style: TextStyle(color: Colors.black)),
         );
-      },
-    );
-  }
+      }
+
+      List<Map<String, String>> currentConversation = 
+          chatProvider.conversations[selectedConversationIndex];
+
+      return ListView.builder(
+        controller: _scrollController,
+        itemCount: currentConversation.length,
+        itemBuilder: (context, index) {
+          return _buildMessage(currentConversation[index]);
+        },
+      );
+    },
+  );
+}
 
   Widget _buildInputArea() {
     return Container(

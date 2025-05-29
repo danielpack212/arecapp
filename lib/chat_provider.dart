@@ -54,6 +54,14 @@ Future<void> addNewChat(String ticketId, String symptom) async {
   notifyListeners();
 }
 
+  void ensureConversationExists(int index) {
+    while (conversations.length <= index) {
+      conversations.add([]);
+      chatTitles.add('New Chat ${conversations.length}');
+    }
+    notifyListeners();
+  }
+  
   void removeResolvedChat(String ticketId) {
     int index =
         chatTitles.indexWhere((title) => title.startsWith('$ticketId:'));
