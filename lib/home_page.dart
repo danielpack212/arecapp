@@ -310,19 +310,23 @@ Future<void> _initializeChats(String userRole, String userId) async {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: isWebPlatform()
-          ? null
-          : AppBar(
-              title: Text('Chatbot', style: TextStyle(color: Colors.white)),
-              backgroundColor: Colors.grey[900],
-              actions:
-                  _chatProvider.conversations.isEmpty ? [] : [_buildDropdown()],
-            ),
-      body: isWebPlatform() ? _buildWebLayout() : _buildMobileLayout(),
-      resizeToAvoidBottomInset: true,
-    );
-  }
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: isWebPlatform()
+        ? null
+        : AppBar(
+            title: Text('Chatbot', style: TextStyle(color: Colors.white)),
+            backgroundColor: Colors.grey[900],
+            actions: _chatProvider.conversations.isEmpty ? [] : [_buildDropdown()],
+          ),
+    body: Consumer<ChatProvider>(
+      builder: (context, chatProvider, child) {
+        chatProvider.ensureConversationExists(selectedConversationIndex);
+        return isWebPlatform() ? _buildWebLayout() : _buildMobileLayout();
+      },
+    ),
+    resizeToAvoidBottomInset: true,
+  );
+}
 }
