@@ -322,7 +322,6 @@ Widget build(BuildContext context) {
           ),
     body: Consumer<ChatProvider>(
       builder: (context, chatProvider, child) {
-        chatProvider.ensureConversationExists(selectedConversationIndex);
         return isWebPlatform() ? _buildWebLayout() : _buildMobileLayout();
       },
     ),
