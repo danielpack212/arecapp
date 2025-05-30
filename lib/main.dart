@@ -16,6 +16,7 @@ import 'package:provider/provider.dart';
 import 'user_provider.dart';
 import 'chat_provider.dart';
 
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -27,6 +28,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
 
   try {
     await Firebase.initializeApp(
@@ -67,6 +69,8 @@ Future<void> main() async {
     ),
   );
 }
+
+
 
 Future<void> _setupFlutterNotifications() async {
   const AndroidInitializationSettings initializationSettingsAndroid =

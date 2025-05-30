@@ -567,46 +567,64 @@ void _initializeChatsFromFirestore() async {
   }
 
   Widget _buildFilterBar() {
-    return Row(
-      children: [
-        Expanded(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildFilterButton(
-                  'Classification', classifications, selectedClassification,
-                  (value) {
+  return Row(
+    children: [
+      Expanded(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildFilterButton(
+              'Classification',
+              classifications,
+              selectedClassification,
+              (value) {
                 setState(() => selectedClassification = value!);
-              }),
-              _buildFilterButton('Status', statuses, selectedStatus, (value) {
+              },
+            ),
+            _buildFilterButton(
+              'Status',
+              statuses,
+              selectedStatus,
+              (value) {
                 setState(() => selectedStatus = value!);
-              }),
-              _buildFilterButton('Location', locations, selectedLocation,
-                  (value) {
+              },
+            ),
+            _buildFilterButton(
+              'Location',
+              locations,
+              selectedLocation,
+              (value) {
                 setState(() => selectedLocation = value!);
-              }),
-              _buildSortByButton(),
-              ElevatedButton(
-                child: Text('Reset Filters'),
-                onPressed: () {
-                  setState(() {
-                    selectedClassification = 'All';
-                    selectedStatus = 'All';
-                    selectedLocation = 'All';
-                  });
-                },
+              },
+            ),
+            _buildSortByButton(),
+            ElevatedButton(
+              child: Text('Reset Filters', style: TextStyle(color: Colors.black)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                elevation: 2,
+                side: BorderSide(color: Colors.grey[300]!),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-            ],
-          ),
+              onPressed: () {
+                setState(() {
+                  selectedClassification = 'All';
+                  selectedStatus = 'All';
+                  selectedLocation = 'All';
+                });
+              },
+            ),
+          ],
         ),
-        SizedBox(width: 16),
-        Expanded(
-          child: _buildSearchBar(),
-        ),
-      ],
-    );
-  }
+      ),
+      SizedBox(width: 16),
+      Expanded(
+        child: _buildSearchBar(),
+      ),
+    ],
+  );
+}
 
   Widget _buildFilterButton(String label, List<String> items, String value,
       void Function(String?) onChanged) {
@@ -976,12 +994,18 @@ void _initializeChatsFromFirestore() async {
 
 Widget _buildCreateNewTaskButton(BuildContext context) {
   return Container(
-    width: 200, // Set a suitable width
+    width: 200,
     child: ElevatedButton(
       onPressed: () {
         showCreateTaskDialog(context, context.read<UserProvider>().userRole);
       },
-      child: Text('Create New Task'),
+      child: Text('Create New Task', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        elevation: 2,
+        side: BorderSide(color: Colors.grey[300]!),
+        padding: EdgeInsets.symmetric(vertical: 16),
+      ),
     ),
   );
 }
@@ -1313,6 +1337,39 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
     },
   );
 }
+Widget _buildActionButtons(BuildContext context, Map<String, dynamic> data, String userRole) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.end,
+    children: [
+      if (userRole == 'Energy Expert')
+        ElevatedButton(
+          child: Text('Assign Technician'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          onPressed: () => _showAssignTechnicianDialog(context, data),
+        ),
+      SizedBox(width: 16),
+      ElevatedButton(
+        child: Text('Close Ticket Summary'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.grey[300],
+          foregroundColor: Colors.black,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+    ],
+  );
+}
 
 Widget _buildHeaderRow(Map<String, dynamic> data) {
   return Row(
@@ -1333,39 +1390,56 @@ Widget _buildHeaderRow(Map<String, dynamic> data) {
   );
 }
 
+
 Widget _buildScrollableContent(Map<String, dynamic> data, BuildContext context) {
   return SingleChildScrollView(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (kIsWeb && data['imageUrl'] != null) _buildImageWidget(data['imageUrl']),
-        SizedBox(height: 16),
-        _buildDetailSection('Classification', [data['classification'] ?? 'N/A']),
-        if (data['description'] != null && data['description'].isNotEmpty)
-          _buildDetailSection('Description', [data['description']]),
-        if (data['subSymptoms'] != null && (data['subSymptoms'] as List).isNotEmpty)
-          _buildDetailSection(
-            'Sub-symptoms',
-            (data['subSymptoms'] as List).map<String>((subSymptom) => 
-              '${subSymptom['name']}: ${subSymptom['percentage']}%'
-            ).toList(),
-          ),
-        _buildDetailSection('Assigned To', [data['assignedToName'] ?? 'Unassigned']),
-        _buildAvailableTechnicians(data['location']),
-      ].map((widget) => Padding(
-        padding: EdgeInsets.only(bottom: 16),
-        child: widget,
-      )).toList(),
+        if (kIsWeb && data['imageUrl'] != null) 
+          _buildImageWidget(data['imageUrl']),
+        SizedBox(height: 24),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoCard('Classification', data['classification'] ?? 'N/A'),
+                  SizedBox(height: 16),
+                  _buildInfoCard('Description', data['description'] ?? 'No description available'),
+                  SizedBox(height: 16),
+                  if (data['subSymptoms'] != null && (data['subSymptoms'] as List).isNotEmpty)
+                    _buildSubSymptomsCard(data['subSymptoms']),
+                ],
+              ),
+            ),
+            SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoCard('Assigned To', data['assignedToName'] ?? 'Unassigned'),
+                  SizedBox(height: 16),
+                  _buildTechniciansCard(data['location'], data['assignedToName']),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
     ),
   );
 }
+
 
 Widget _buildImageWidget(String imageUrl) {
   return Center(
     child: Container(
       constraints: BoxConstraints(
-        maxWidth: 400, // Adjust this value as needed
-        maxHeight: 250, // Adjust this value as needed
+        maxWidth: 400,
+        maxHeight: 250,
       ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
@@ -1387,6 +1461,83 @@ Widget _buildImageWidget(String imageUrl) {
             return Center(child: Text('Failed to load image'));
           },
         ),
+      ),
+    ),
+  );
+}
+
+Widget _buildInfoCard(String title, String content) {
+  return Card(
+    elevation: 4,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: Padding(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text(content),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildTechniciansCard(String location, String? assignedTechnician) {
+  return FutureBuilder<List<String>>(
+    future: _fetchTechniciansForBuilding(location),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return CircularProgressIndicator();
+      } else if (snapshot.hasError) {
+        return Text('Error: ${snapshot.error}');
+      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+        return Text('No technicians available');
+      } else {
+        return Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Available Technicians', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                SizedBox(height: 8),
+                ...snapshot.data!.map((tech) => 
+                  ListTile(
+                    leading: CircleAvatar(child: Text(tech[0])),
+                    title: Text(tech),
+                    tileColor: tech == assignedTechnician ? Colors.blue.withOpacity(0.1) : null,
+                  )
+                ).toList(),
+              ],
+            ),
+          ),
+        );
+      }
+    },
+  );
+}
+
+
+
+Widget _buildSubSymptomsCard(List subSymptoms) {
+  return Card(
+    elevation: 4,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: Padding(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Sub-symptoms', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          ...subSymptoms.map((subSymptom) => 
+            Text('${subSymptom['name']}: ${subSymptom['percentage']}%')
+          ).toList(),
+        ],
       ),
     ),
   );
@@ -1439,23 +1590,6 @@ Widget _buildAvailableTechnicians(String location) {
   );
 }
 
-Widget _buildActionButtons(BuildContext context, Map<String, dynamic> data, String userRole) {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.end,
-    children: [
-      if (userRole == 'Energy Expert')
-        ElevatedButton(
-          child: Text('Assign Technician'),
-          onPressed: () => _showAssignTechnicianDialog(context, data),
-        ),
-      SizedBox(width: 16),
-      ElevatedButton(
-        child: Text('Close Ticket Summary'),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-    ],
-  );
-}
 
 
 
