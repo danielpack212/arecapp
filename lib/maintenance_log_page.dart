@@ -491,80 +491,72 @@ void _initializeChatsFromFirestore() async {
     );
   }
 
-  Widget _buildMobileTableRow(Map<String, dynamic> data, String? userRole) {
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ExpansionTile(
-        title: Text(data['symptom'] ?? 'No symptom',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(
-            '${data['location'] ?? 'No location'} - ${data['status'] ?? 'No status'}'),
-        children: [
+Widget _buildMobileTableRow(Map<String, dynamic> data, String? userRole) {
+  return Card(
+    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    child: ExpansionTile(
+      title: Text(data['symptom'] ?? 'No symptom',
+          style: TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(
+          '${data['location'] ?? 'No location'} - ${data['status'] ?? 'No status'}'),
+      children: [
+        ListTile(
+            title: Text('Date Opened: ${data['dateOpened'] ?? 'Unknown'}')),
+        ListTile(title: Text('Ticket ID: ${data['ticketId'] ?? 'Unknown'}')),
+        if (userRole == 'Energy Expert')
           ListTile(
-              title: Text('Date Opened: ${data['dateOpened'] ?? 'Unknown'}')),
-          ListTile(title: Text('Ticket ID: ${data['ticketId'] ?? 'Unknown'}')),
-          if (userRole == 'Energy Expert')
-            ListTile(
-                title: Text(
-                    'Assigned To: ${data['assignedToName'] ?? 'Unassigned'}')),
-          if (userRole == 'Maintenance Technician')
-            FutureBuilder<String>(
-              future: _getAssignedByName(data['assignedBy']),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return ListTile(title: CircularProgressIndicator());
-                }
+              title: Text(
+                  'Assigned To: ${data['assignedToName'] ?? 'Unassigned'}')),
+        if (userRole == 'Maintenance Technician')
+          FutureBuilder<String>(
+            future: _getAssignedByName(data['assignedBy']),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return ListTile(title: CircularProgressIndicator());
+              }
+              return ListTile(
+                  title: Text('Assigned By: ${snapshot.data ?? 'Unknown'}'));
+            },
+          ),
+        if (data['subSymptoms'] != null &&
+            (data['subSymptoms'] as List).isNotEmpty)
+          ListTile(
+            title: Text('Sub-symptoms:'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children:
+                  (data['subSymptoms'] as List).map<Widget>((subSymptom) {
+                return Text(
+                    '${subSymptom['name'] ?? 'Unknown'}: ${subSymptom['percentage'] ?? 'Unknown'}%');
+              }).toList(),
+            ),
+          ),
+        if (userRole == 'Energy Expert')
+          FutureBuilder<List<String>>(
+            future: _fetchTechniciansForBuilding(data['location']),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return ListTile(title: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return ListTile(title: Text('Error: ${snapshot.error}'));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return ListTile(title: Text('No technicians available'));
+              } else {
                 return ListTile(
-                    title: Text('Assigned By: ${snapshot.data ?? 'Unknown'}'));
-              },
-            ),
-          if (data['subSymptoms'] != null &&
-              (data['subSymptoms'] as List).isNotEmpty)
-            ListTile(
-              title: Text('Sub-symptoms:'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children:
-                    (data['subSymptoms'] as List).map<Widget>((subSymptom) {
-                  return Text(
-                      '${subSymptom['name'] ?? 'Unknown'}: ${subSymptom['percentage'] ?? 'Unknown'}%');
-                }).toList(),
-              ),
-            ),
-          if (userRole == 'Energy Expert')
-            FutureBuilder<List<String>>(
-              future: _fetchTechniciansForBuilding(data['location']),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return ListTile(title: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return ListTile(title: Text('Error: ${snapshot.error}'));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return ListTile(title: Text('No technicians available'));
-                } else {
-                  return ListTile(
-                    title: Text('Available Technicians:'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children:
-                          snapshot.data!.map((tech) => Text(tech)).toList(),
-                    ),
-                  );
-                }
-              },
-            ),
-          if (userRole == 'Energy Expert')
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: ElevatedButton(
-                child: Text('Assign Technician'),
-                onPressed: () => _showAssignTechnicianDialog(context, data),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+                  title: Text('Available Technicians:'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children:
+                        snapshot.data!.map((tech) => Text(tech)).toList(),
+                  ),
+                );
+              }
+            },
+          ),
+      ],
+    ),
+  );
+}
 
   Widget _buildFilterBar() {
   return Row(
@@ -1299,142 +1291,108 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
     }
     return '';
   }
-
 void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
   final userRole = context.read<UserProvider>().userRole;
 
   showDialog(
     context: context,
-    builder: (BuildContext context) {
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.8,
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-          ),
-          child: Container(
-            padding: EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeaderRow(data),
-                SizedBox(height: 24),
-                Expanded(
-                  child: _buildScrollableContent(data, context),
+    builder: (BuildContext dialogContext) {
+      return StatefulBuilder(
+        builder: (BuildContext context, StateSetter setDialogState) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.8,
+                maxHeight: MediaQuery.of(context).size.height * 0.9,
+              ),
+              child: Container(
+                padding: EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                SizedBox(height: 24),
-                _buildActionButtons(context, data, userRole),
-              ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeaderRow(data),
+                    SizedBox(height: 24),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: _buildLeftColumn(data),
+                            ),
+                            SizedBox(width: 24),
+                            Expanded(
+                              flex: 1,
+                              child: _buildRightColumn(data, setDialogState),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 24),
+                    _buildCloseButton(dialogContext),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
     },
   );
 }
-Widget _buildActionButtons(BuildContext context, Map<String, dynamic> data, String userRole) {
+
+Widget _buildLeftColumn(Map<String, dynamic> data) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _buildImageWidget(data['imageUrl']),
+    ],
+  );
+}
+
+Widget _buildRightColumn(Map<String, dynamic> data, StateSetter setDialogState) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _buildTechniciansCard(
+        location: data['location'] ?? '',
+        assignedTechnician: data['assignedToName'],
+        taskData: data,
+        onAssignmentComplete: (String? newTechnician) async {
+          await _assignTechnician(data, newTechnician);
+          setDialogState(() {
+            data['assignedToName'] = newTechnician;
+            data['status'] = newTechnician != null ? 'Assigned' : 'Action Required';
+          });
+        },
+      ),
+    ],
+  );
+}
+
+Widget _buildCloseButton(BuildContext context) {
   return Row(
     mainAxisAlignment: MainAxisAlignment.end,
     children: [
-      if (userRole == 'Energy Expert')
-        ElevatedButton(
-          child: Text('Assign Technician'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          onPressed: () => _showAssignTechnicianDialog(context, data),
-        ),
-      SizedBox(width: 16),
       ElevatedButton(
-        child: Text('Close Ticket Summary'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey[300],
-          foregroundColor: Colors.black,
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
+        child: Text('Close'),
         onPressed: () => Navigator.of(context).pop(),
       ),
     ],
   );
 }
 
-Widget _buildHeaderRow(Map<String, dynamic> data) {
-  return Row(
-    children: [
-      Expanded(
-        flex: 2,
-        child: Text(
-          '${data['symptom']}',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      Expanded(child: Text('${data['location']}')),
-      Expanded(child: Text('Status: ${data['status']}')),
-      Expanded(child: Text('Ticket #${data['ticketId']}')),
-      Expanded(child: Text('Opened ${data['dateOpened']}')),
-    ],
-  );
-}
-
-
-Widget _buildScrollableContent(Map<String, dynamic> data, BuildContext context) {
-  return SingleChildScrollView(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (kIsWeb && data['imageUrl'] != null) 
-          _buildImageWidget(data['imageUrl']),
-        SizedBox(height: 24),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoCard('Classification', data['classification'] ?? 'N/A'),
-                  SizedBox(height: 16),
-                  _buildInfoCard('Description', data['description'] ?? 'No description available'),
-                  SizedBox(height: 16),
-                  if (data['subSymptoms'] != null && (data['subSymptoms'] as List).isNotEmpty)
-                    _buildSubSymptomsCard(data['subSymptoms']),
-                ],
-              ),
-            ),
-            SizedBox(width: 24),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoCard('Assigned To', data['assignedToName'] ?? 'Unassigned'),
-                  SizedBox(height: 16),
-                  _buildTechniciansCard(data['location'], data['assignedToName']),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
-
-
-Widget _buildImageWidget(String imageUrl) {
+Widget _buildImageWidget(String? imageUrl) {
+  if (imageUrl == null) {
+    return Center(child: Text('No image available'));
+  }
   return Center(
     child: Container(
       constraints: BoxConstraints(
@@ -1466,6 +1424,149 @@ Widget _buildImageWidget(String imageUrl) {
   );
 }
 
+Widget _buildTechniciansCard({
+  required String location,
+  String? assignedTechnician,
+  required Map<String, dynamic> taskData,
+  required Function(String?) onAssignmentComplete,
+}) {
+  return Card(
+    elevation: 4,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    color: Colors.white,
+    child: Padding(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Available Technicians', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          FutureBuilder<List<String>>(
+            future: _fetchTechniciansForBuilding(location),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return ListTile(
+                  title: Text('Error: ${snapshot.error}'),
+                  tileColor: Colors.red.withOpacity(0.1),
+                );
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return ListTile(
+                  leading: Icon(Icons.warning, color: Colors.orange),
+                  title: Text('No technicians available'),
+                  tileColor: Colors.orange.withOpacity(0.1),
+                );
+              } else {
+                return Column(
+                  children: snapshot.data!.map((tech) => 
+                    GestureDetector(
+                      onDoubleTap: () => _showConfirmationDialog(
+                        context, 
+                        taskData, 
+                        tech,
+                        onAssignmentComplete  // Add this line
+                      ),
+                      child: Container(
+                        margin: EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: tech == assignedTechnician 
+                            ? Colors.blue.withOpacity(0.1) 
+                            : Colors.transparent,
+                          border: tech == assignedTechnician
+                            ? Border.all(color: Colors.blue.withOpacity(0.3), width: 1)
+                            : null,
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            child: Text(tech[0], style: TextStyle(color: Colors.white)),
+                            backgroundColor: Colors.blue,
+                          ),
+                          title: Text(tech),
+                          trailing: tech == assignedTechnician
+                            ? Icon(Icons.check_circle, color: Colors.blue)
+                            : null,
+                        ),
+                      ),
+                    )
+                  ).toList(),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _showAssignmentConfirmationDialog(BuildContext context, Map<String, dynamic> taskData, String selectedTechnician) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Confirm Assignment'),
+        content: Text('Are you sure you want to assign this task to $selectedTechnician?'),
+        actions: <Widget>[
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+          TextButton(
+            child: Text('Confirm'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _assignTechnician(taskData, selectedTechnician);
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Widget _buildActionButtons(BuildContext context, Map<String, dynamic> data, String userRole) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.end,
+    children: [
+      ElevatedButton(
+        child: Text('Close Ticket Summary'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.grey[300],
+          foregroundColor: Colors.black,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+    ],
+  );
+}
+Widget _buildHeaderRow(Map<String, dynamic> data) {
+  return Row(
+    children: [
+      Expanded(
+        flex: 2,
+        child: Text(
+          '${data['symptom']}',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      Expanded(child: Text('${data['location']}')),
+      Expanded(child: Text('Status: ${data['status']}')),
+      Expanded(child: Text('Ticket #${data['ticketId']}')),
+      Expanded(child: Text('Opened ${data['dateOpened']}')),
+    ],
+  );
+}
+
+
 Widget _buildInfoCard(String title, String content) {
   return Card(
     elevation: 4,
@@ -1481,43 +1582,6 @@ Widget _buildInfoCard(String title, String content) {
         ],
       ),
     ),
-  );
-}
-
-Widget _buildTechniciansCard(String location, String? assignedTechnician) {
-  return FutureBuilder<List<String>>(
-    future: _fetchTechniciansForBuilding(location),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return CircularProgressIndicator();
-      } else if (snapshot.hasError) {
-        return Text('Error: ${snapshot.error}');
-      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-        return Text('No technicians available');
-      } else {
-        return Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Available Technicians', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                ...snapshot.data!.map((tech) => 
-                  ListTile(
-                    leading: CircleAvatar(child: Text(tech[0])),
-                    title: Text(tech),
-                    tileColor: tech == assignedTechnician ? Colors.blue.withOpacity(0.1) : null,
-                  )
-                ).toList(),
-              ],
-            ),
-          ),
-        );
-      }
-    },
   );
 }
 
@@ -1601,85 +1665,38 @@ Widget _buildAvailableTechnicians(String location) {
         .get();
     return snapshot.docs.map((doc) => doc.get('name') as String).toList();
   }
+void _showConfirmationDialog(BuildContext context, Map<String, dynamic> data, String? selectedTechnician, Function(String?) onAssignmentComplete) {
+  String message = selectedTechnician == null
+      ? 'Are you sure you want to unassign this task?'
+      : 'Are you sure you want to assign $selectedTechnician to this task?';
 
-  void _showAssignTechnicianDialog(
-      BuildContext context, Map<String, dynamic> data) async {
-    List<String> technicians =
-        await _fetchTechniciansForBuilding(data['location']);
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Assign Technician'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: [
-                ListTile(
-                  title: Text('Unassign'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _showConfirmationDialog(context, data, null);
-                  },
-                ),
-                ...technicians.isEmpty
-                    ? [ListTile(title: Text('No available technicians'))]
-                    : technicians.map((String technician) {
-                        return ListTile(
-                          title: Text(technician),
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            _showConfirmationDialog(context, data, technician);
-                          },
-                        );
-                      }).toList(),
-              ],
-            ),
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text(selectedTechnician == null
+            ? 'Confirm Unassignment'
+            : 'Confirm Technician Assignment'),
+        content: Text(message),
+        actions: <Widget>[
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
           ),
-          actions: [
-            TextButton(
-              child: Text('Close'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showConfirmationDialog(BuildContext context, Map<String, dynamic> data,
-      String? selectedTechnician) {
-    String message = selectedTechnician == null
-        ? 'Are you sure you want to unassign this task?'
-        : 'Are you sure you want to assign $selectedTechnician to this task?';
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(selectedTechnician == null
-              ? 'Confirm Unassignment'
-              : 'Confirm Technician Assignment'),
-          content: Text(message),
-          actions: <Widget>[
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('Confirm'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _assignTechnician(data, selectedTechnician);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+          TextButton(
+            child: Text('Confirm'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              onAssignmentComplete(selectedTechnician);
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
 
 Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechnician) async {
   try {
