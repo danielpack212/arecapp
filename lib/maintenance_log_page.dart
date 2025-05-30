@@ -123,7 +123,7 @@ void _listenForNewTasks() {
   final userId = FirebaseAuth.instance.currentUser!.uid;
 
   Query query = FirebaseFirestore.instance.collection('tasks');
-  
+
   if (userRole == 'Maintenance Technician') {
     query = query.where('assignedTo', isEqualTo: userId);
   } else {
@@ -1291,34 +1291,33 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
     }
     return '';
   }
-void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
-  final userRole = context.read<UserProvider>().userRole;
+  void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
+    final userRole = context.read<UserProvider>().userRole;
 
-  showDialog(
-    context: context,
-    builder: (BuildContext dialogContext) {
-      return StatefulBuilder(
-        builder: (BuildContext context, StateSetter setDialogState) {
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.8,
-                maxHeight: MediaQuery.of(context).size.height * 0.9,
-              ),
-              child: Container(
-                padding: EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setDialogState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.8,
+                  maxHeight: MediaQuery.of(context).size.height * 0.9,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeaderRow(data),
-                    SizedBox(height: 24),
-                    Expanded(
-                      child: SingleChildScrollView(
+                child: Container(
+                  padding: EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeaderRow(data),
+                      SizedBox(height: 24),
+                      Expanded(
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1334,21 +1333,22 @@ void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
                           ],
                         ),
                       ),
-                    ),
-                    SizedBox(height: 24),
-                    _buildCloseButton(dialogContext),
-                  ],
+                      SizedBox(height: 24),
+                      _buildTaskSummaryWidget(data['id']),
+                      SizedBox(height: 24),
+                      _buildCloseButton(dialogContext),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
-      );
-    },
-  );
-}
+            );
+          },
+        );
+      },
+    );
+  }
 
-Widget _buildLeftColumn(Map<String, dynamic> data) {
+  Widget _buildLeftColumn(Map<String, dynamic> data) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -1800,4 +1800,92 @@ Future<void> _sendNotificationToTechnician(String technicianUid, String ticketId
     print('🚨 Error sending notification: $e');
   }
 }
+
+  Future<Map<String, dynamic>> _fetchTaskSummary(String taskId) async {
+    DocumentSnapshot taskDoc = await FirebaseFirestore.instance
+        .collection('tasks')
+        .doc(taskId)
+        .get();
+
+    if (!taskDoc.exists) {
+      return {'error': 'Task not found'};
+    }
+
+    Map<String, dynamic> data = taskDoc.data() as Map<String, dynamic>;
+
+    return {
+      'summary': data['summary'] ?? 'No summary available yet.', // This will contain the LLM-generated summary
+    };
+  }
+
+  Widget _buildTaskSummaryWidget(String taskId) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _fetchTaskSummary(taskId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red));
+        } else if (!snapshot.hasData) {
+          return Text('No summary available', style: TextStyle(fontStyle: FontStyle.italic));
+        }
+
+        Map<String, dynamic> summary = snapshot.data!;
+        return Container(
+          constraints: BoxConstraints(maxHeight: 200), // Set a maximum height for the summary
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue[50]!, Colors.blue[100]!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.3),
+                spreadRadius: 2,
+                blurRadius: 5,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.summarize, color: Colors.blue[800]),
+                      SizedBox(width: 8),
+                      Text(
+                        'Task Summary',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    summary['summary'],
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
 }
