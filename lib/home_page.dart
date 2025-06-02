@@ -53,30 +53,32 @@ Future<void> _initializeChats(String userRole, String userId) async {
 }
 
   bool isWebPlatform() => kIsWeb;
-
-  Future<void> _sendMessage(String message) async {
+Future<void> _sendMessage(String message, {int? conversationIndex}) async {
+  // Use null-coalescing operator to ensure conversationIndex is non-null
+  int safeIndex = conversationIndex ?? selectedConversationIndex;
+  
   if (message.trim().isEmpty) return;
 
   setState(() {
     if (_chatProvider.conversations.isEmpty) {
       _chatProvider.conversations.add([]);
-      selectedConversationIndex = 0;
+      safeIndex = 0;
     }
 
     // Ensure we're working with the correct conversation
-    if (selectedConversationIndex >= _chatProvider.conversations.length) {
-      selectedConversationIndex = _chatProvider.conversations.length - 1;
+    if (safeIndex >= _chatProvider.conversations.length) {
+      safeIndex = _chatProvider.conversations.length - 1;
     }
 
-    // Add the user's message to the current conversation
-    _chatProvider.conversations[selectedConversationIndex].add({'sender': 'user', 'text': message});
+    // Add the user's message to the specific conversation
+    _chatProvider.conversations[safeIndex].add({'sender': 'user', 'text': message});
   });
 
   _controller.clear();
-  _scrollToBottom();
+  _scrollToBottom(conversationIndex: safeIndex);
 
   try {
-    String ticketId = _chatProvider.chatTitles[selectedConversationIndex].split('#').last.trim();
+    String ticketId = _chatProvider.chatTitles[safeIndex].split('#').last.trim();
     if (ticketId.isEmpty) throw Exception('Invalid ticketId');
 
     final requestBody = jsonEncode({'text': message, 'ticketId': ticketId});
@@ -99,7 +101,7 @@ Future<void> _initializeChats(String userRole, String userId) async {
     if (response.statusCode == 200) {
       var responseData = jsonDecode(response.body);
       setState(() {
-        _chatProvider.conversations[selectedConversationIndex].add({'sender': 'bot', 'text': responseData['answer']});
+        _chatProvider.conversations[safeIndex].add({'sender': 'bot', 'text': responseData['answer']});
       });
     } else {
       throw Exception('Server responded with status code: ${response.statusCode}. Body: ${response.body}');
@@ -107,12 +109,25 @@ Future<void> _initializeChats(String userRole, String userId) async {
   } catch (e) {
     print('Error in _sendMessage: $e');
     setState(() {
-      _chatProvider.conversations[selectedConversationIndex].add({'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'});
+      _chatProvider.conversations[safeIndex].add({'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'});
     });
   }
 
-  _scrollToBottom();
+  _scrollToBottom(conversationIndex: safeIndex);
   _chatProvider.notifyListeners();
+}
+
+void _scrollToBottom({int? conversationIndex}) {
+  int safeIndex = conversationIndex ?? selectedConversationIndex;
+  Future.delayed(Duration(milliseconds: 100), () {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  });
 }
 
   void _addMessage(Map<String, String> message) {
@@ -121,17 +136,6 @@ Future<void> _initializeChats(String userRole, String userId) async {
     _listKey.currentState?.insertItem(index);
   }
 
-  void _scrollToBottom() {
-    Future.delayed(Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
 
   Future<void> _startListening() async {
     if (!_isListening) {
@@ -238,7 +242,7 @@ Future<void> _initializeChats(String userRole, String userId) async {
           Expanded(
             child: TextField(
               controller: _controller,
-              onSubmitted: _sendMessage,
+              onSubmitted: (text) => _sendMessage(text, conversationIndex: selectedConversationIndex),
               style: TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Type your message...',
@@ -261,7 +265,7 @@ Future<void> _initializeChats(String userRole, String userId) async {
           ),
           IconButton(
             icon: Icon(Icons.send, color: Colors.white),
-            onPressed: () => _sendMessage(_controller.text),
+            onPressed: () => _sendMessage(_controller.text,conversationIndex: selectedConversationIndex),
           ),
         ],
       ),
