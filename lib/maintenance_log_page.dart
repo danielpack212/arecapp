@@ -1382,7 +1382,16 @@ Widget _buildCloseButton(BuildContext context) {
     mainAxisAlignment: MainAxisAlignment.end,
     children: [
       ElevatedButton(
-        child: Text('Close'),
+        child: Text('Close', style: TextStyle(color: Colors.black)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          elevation: 2,
+          side: BorderSide(color: Colors.grey[300]!),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
         onPressed: () => Navigator.of(context).pop(),
       ),
     ],

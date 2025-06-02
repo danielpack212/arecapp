@@ -99,6 +99,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Maintenance Chatbot App',
       theme: ThemeData(
+        fontFamily: 'TimesNewRoman',
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: const Color(0xFFFAFAFA),
       ),
@@ -239,7 +240,27 @@ class _MainNavigationState extends State<MainNavigation> {
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('TuneUp', style: TextStyle(color: Colors.white)),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'TuneUp',
+            style: TextStyle(
+              color: Colors.white,
+              //fontSize: 24, // Adjust font size as needed
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(right: 0.0, top: 0.0, bottom: 10.0), // Adjust padding as needed
+            child: Image.asset(
+              'assets/logo.png',
+              height: 50, // Adjust height as needed
+              fit: BoxFit.contain,
+            ),
+          ),
+
+        ],
+      ),
               Row(
                 children: [
                   TextButton(
