@@ -7,6 +7,159 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'chat_provider.dart'; // Make sure you've created this file
 import 'notification_service.dart';
 import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+Future<String> generatePlot(String startDate, String endDate, String consumptionType, String taskId) async {
+  final serverUrl = 'http://localhost:3000/generate-plot';
+  // For Android emulator, use:
+  // final serverUrl = 'http://10.0.2.2:3000/generate-plot';
+
+  try {
+    final response = await http.post(
+      Uri.parse(serverUrl),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        'start_date': startDate,
+        'end_date': endDate,
+        'consumption_type': consumptionType,
+        'taskId': taskId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      if (responseData['plotUrl'] != null) {
+        return responseData['plotUrl'];
+      } else {
+        throw Exception('Plot URL not found in response');
+      }
+    } else {
+      throw Exception('Failed to generate plot: ${response.body}');
+    }
+  } catch (e) {
+    print('Error in generatePlot: $e');
+    rethrow;
+  }
+}
+
+class DateRangePicker extends StatelessWidget {
+  final DateTimeRange initialDateRange;
+  final DateTime firstDate;
+  final DateTime lastDate;
+
+  const DateRangePicker({
+    Key? key,
+    required this.initialDateRange,
+    required this.firstDate,
+    required this.lastDate,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return DateRangePickerDialog(
+      initialDateRange: initialDateRange,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+  }
+}
+
+class PlotWidget extends StatefulWidget {
+  final String startDate;
+  final String endDate;
+  final String consumptionType;
+  final String taskId;
+
+  PlotWidget({
+    required this.startDate,
+    required this.endDate,
+    required this.consumptionType,
+    required this.taskId,
+  });
+
+  @override
+  _PlotWidgetState createState() => _PlotWidgetState();
+}
+
+class _PlotWidgetState extends State<PlotWidget> {
+  String? _imageUrl;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _updatePlot();
+  }
+
+  @override
+  void didUpdateWidget(PlotWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.startDate != widget.startDate || 
+        oldWidget.endDate != widget.endDate || 
+        oldWidget.consumptionType != widget.consumptionType) {
+      _updatePlot();
+    }
+  }
+
+  Future<void> _updatePlot() async {
+    setState(() {
+      _imageUrl = null;
+      _errorMessage = null;
+    });
+
+    try {
+      final url = await generatePlot(
+        widget.startDate,
+        widget.endDate,
+        widget.consumptionType,
+        widget.taskId,
+      );
+      if (url.isNotEmpty) {
+        setState(() {
+          _imageUrl = url;
+        });
+      } else {
+        throw Exception('Received empty URL');
+      }
+    } catch (e) {
+      print('Error generating plot: $e');
+      setState(() {
+        _errorMessage = 'Failed to generate plot: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (_imageUrl != null)
+          Image.network(
+            _imageUrl!,
+            loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+              if (loadingProgress == null) return child;
+              return CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                    : null,
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              print('Error loading image: $error');
+              return Text('Failed to load image');
+            },
+          ),
+        if (_imageUrl == null && _errorMessage == null)
+          CircularProgressIndicator(),
+        if (_errorMessage != null)
+          Text(_errorMessage!, style: TextStyle(color: Colors.red)),
+      ],
+    );
+  }
+}
 
 class MaintenanceLogPage extends StatefulWidget {
   @override
@@ -15,7 +168,7 @@ class MaintenanceLogPage extends StatefulWidget {
 
 class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   String searchQuery = '';
-  List<String> classifications = ['All', 'Plumbing', 'Electrical', 'HVAC'];
+  List<String> classifications = ['All', 'Water', 'Electricity', 'Heating', 'Cooling'];
   List<String> statuses = ['All', 'Action Required', 'Assigned'];
   List<String> locations = ['All', 'Hofburg', 'TUWien'];
   String selectedClassification = 'All';
@@ -118,6 +271,7 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
     },
   ];
 
+
 void _listenForNewTasks() {
   final userRole = Provider.of<UserProvider>(context, listen: false).userRole;
   final userId = FirebaseAuth.instance.currentUser!.uid;
@@ -137,7 +291,7 @@ void _listenForNewTasks() {
         String ticketId = change.doc['ticketId'];
         String symptom = change.doc['symptom'] ?? 'Unknown issue';
         if (!_chatProvider.chatExists(ticketId)) {
-          _chatProvider.addNewChat(ticketId, symptom);
+          _chatProvider.addNewChat(ticketId,userId, symptom);
         }
       }
     }
@@ -178,7 +332,7 @@ void _initializeChatsFromFirestore() async {
     String ticketId = doc['ticketId'];
     String symptom = doc['symptom'] ?? 'Unknown issue';
     if (!_chatProvider.chatExists(ticketId)) {
-      await _chatProvider.addNewChat(ticketId, symptom);
+      await _chatProvider.addNewChat(ticketId, userId, symptom);
     }
   }
 }
@@ -233,10 +387,10 @@ void _initializeChatsFromFirestore() async {
   }
 
 // create new chat
-  void createNewChatTab(String ticketId, String Symptom) {
+  void createNewChatTab(String ticketId, String symptom, String userId) {
     // You'll need to implement a way to communicate between pages
     // One way is to use a global state management solution like Provider
-    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId, Symptom);
+    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,userId, symptom);
   }
 
 // close chat
@@ -1216,7 +1370,7 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
       });
 
       // Create a new chat for this task
-      Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,symptom);
+      Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,technician,symptom);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('New task created successfully')),
@@ -1291,75 +1445,164 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
     }
     return '';
   }
-  void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
-    final userRole = context.read<UserProvider>().userRole;
 
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setDialogState) {
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.8,
-                  maxHeight: MediaQuery.of(context).size.height * 0.9,
-                ),
-                child: Container(
-                  padding: EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeaderRow(data),
-                      SizedBox(height: 24),
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 1,
-                              child: _buildLeftColumn(data),
-                            ),
-                            SizedBox(width: 24),
-                            Expanded(
-                              flex: 1,
-                              child: _buildRightColumn(data, setDialogState),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 24),
-                      _buildTaskSummaryWidget(data['id']),
-                      SizedBox(height: 24),
-                      _buildCloseButton(dialogContext),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
+  final userRole = context.read<UserProvider>().userRole;
+  
+  DateTime endDate = DateTime.now();
+  DateTime startDate = endDate.subtract(Duration(days: 365));
+
+  // Ensure startDate is not after endDate
+  if (startDate.isAfter(endDate)) {
+    startDate = endDate;
   }
 
-  Widget _buildLeftColumn(Map<String, dynamic> data) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+  showDialog(
+    context: context,
+    builder: (BuildContext dialogContext) {
+      return StatefulBuilder(
+        builder: (BuildContext context, StateSetter setDialogState) {
+          return Dialog(
+            backgroundColor: Colors.white,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.8,
+              height: MediaQuery.of(context).size.height * 0.8,
+              padding: EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeaderRow(data),
+                  SizedBox(height: 24),
+                  Row(
+                    children: [
+                      ElevatedButton(
+                        onPressed: () async {
+                          final DateTime? pickedStart = await showDatePicker(
+                            context: context,
+                            initialDate: startDate,
+                            firstDate: DateTime(2000),
+                            lastDate: endDate,
+                            builder: (BuildContext context, Widget? child) {
+                              return Theme(
+                                data: ThemeData.light().copyWith(
+                                  colorScheme: ColorScheme.light(primary: Colors.black),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (pickedStart != null) {
+                            final DateTime? pickedEnd = await showDatePicker(
+                              context: context,
+                              initialDate: endDate,
+                              firstDate: pickedStart,
+                              lastDate: DateTime.now(),
+                              builder: (BuildContext context, Widget? child) {
+                                return Theme(
+                                  data: ThemeData.light().copyWith(
+                                    colorScheme: ColorScheme.light(primary: Colors.black),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (pickedEnd != null) {
+                              setDialogState(() {
+                                startDate = pickedStart;
+                                endDate = pickedEnd;
+                              });
+                            }
+                          }
+                        },
+                        child: Text('Select Date Range', style: TextStyle(color: Colors.black)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          elevation: 2,
+                          side: BorderSide(color: Colors.grey[300]!),
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 20),
+                      Text('${_formatDate(startDate)} to ${_formatDate(endDate)}'),
+                    ],
+                  ),
+                  SizedBox(height: 24),
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 1,
+                          child: _buildLeftColumn(data, _formatDate(startDate), _formatDate(endDate)),
+                        ),
+                        SizedBox(width: 24),
+                        Expanded(
+                          flex: 1,
+                          child: _buildRightColumn(data, setDialogState),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  Container(
+                    height: 150, // Adjust this value as needed
+                    child: SingleChildScrollView(
+                      child: _buildTaskSummaryWidget(data['id']),
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  _buildCloseButton(dialogContext),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+
+DateTime _parseDate(String date) {
+  // First, try parsing the date as is
+  try {
+    return DateTime.parse(date);
+  } catch (_) {
+    // If that fails, try parsing it as "dd-MM-yyyy"
+    try {
+      List<String> parts = date.split('-');
+      return DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+    } catch (_) {
+      // If all else fails, return the current date
+      print('Failed to parse date: $date');
+      return DateTime.now();
+    }
+  }
+}
+
+
+
+Widget _buildLeftColumn(Map<String, dynamic> data, String startDate, String endDate) {
+  return ListView(
+    shrinkWrap: true,
     children: [
-      _buildImageWidget(data['imageUrl']),
+      SizedBox(height: 20),
+      PlotWidget(
+        startDate: startDate,
+        endDate: endDate,
+        consumptionType: data['classification'].toLowerCase(),
+        taskId: data['id'],
+      ),
     ],
   );
 }
 
 Widget _buildRightColumn(Map<String, dynamic> data, StateSetter setDialogState) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+  return ListView(
+    shrinkWrap: true,
     children: [
       _buildTechniciansCard(
         location: data['location'] ?? '',
@@ -1760,7 +2003,7 @@ Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechni
       
       // Create a new chat for the assigned technician
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      await chatProvider.addNewChat(data['ticketId'], data['symptom']);
+      await chatProvider.addNewChat(data['ticketId'], data['userId'], data['symptom']);
     }
 
     // Update UI

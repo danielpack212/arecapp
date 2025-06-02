@@ -13,47 +13,48 @@ class ChatProvider extends ChangeNotifier {
     return chatTitles.any((title) => title.startsWith('$ticketId:'));
   }
 
-Future<void> addNewChat(String ticketId, String symptom) async {
-  if (chatExists(ticketId)) return;
+  Future<void> addNewChat(String ticketId, String userId, String symptom) async {
+    if (chatExists(ticketId)) return;
 
-  chatTitles.add('$ticketId: $symptom');
-  List<Map<String, String>> newConversation = [];
+    chatTitles.add('$ticketId: $symptom');
+    List<Map<String, String>> newConversation = [];
 
-  try {
-    final response = await http.post(
-      Uri.parse('$BASE_URL/initial_chat'),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: jsonEncode(<String, String>{
-        'ticketId': ticketId,
-        'symptom': symptom,
-      }),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse('$BASE_URL/initial_chat'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(<String, String>{
+          'ticketId': ticketId,
+          'user_id': userId,
+          'symptom': symptom,
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      var responseData = jsonDecode(response.body);
-      String initialMessage = responseData['message'];
-      newConversation.add({'sender': 'bot', 'text': initialMessage});
-    } else {
+      if (response.statusCode == 200) {
+        var responseData = jsonDecode(response.body);
+        String initialMessage = responseData['message'];
+        newConversation.add({'sender': 'bot', 'text': initialMessage});
+      } else {
+        newConversation.add({
+          'sender': 'bot',
+          'text':
+              'Welcome to the chat for Task #$ticketId. How can I assist you with the $symptom issue?'
+        });
+      }
+    } catch (e) {
       newConversation.add({
         'sender': 'bot',
         'text':
             'Welcome to the chat for Task #$ticketId. How can I assist you with the $symptom issue?'
       });
     }
-  } catch (e) {
-    newConversation.add({
-      'sender': 'bot',
-      'text':
-          'Welcome to the chat for Task #$ticketId. How can I assist you with the $symptom issue?'
-    });
+
+    conversations.add(newConversation);
+    notifyListeners();
   }
 
-  conversations.add(newConversation);
-  notifyListeners();
-}
-  
   void removeResolvedChat(String ticketId) {
     int index =
         chatTitles.indexWhere((title) => title.startsWith('$ticketId:'));
@@ -80,14 +81,16 @@ Future<void> addNewChat(String ticketId, String symptom) async {
           .where('assignedTo', isEqualTo: userId)
           .get();
     } else {
-      // Handle other roles or throw an error
       return;
     }
 
     for (var doc in snapshot.docs) {
       String ticketId = doc['ticketId'];
       String symptom = doc['symptom'];
-      await addNewChat(ticketId, symptom);
+      await addNewChat(ticketId, userId, symptom);
     }
   }
 }
+
+
+

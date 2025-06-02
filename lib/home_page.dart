@@ -53,6 +53,7 @@ Future<void> _initializeChats(String userRole, String userId) async {
 }
 
   bool isWebPlatform() => kIsWeb;
+  
 Future<void> _sendMessage(String message, {int? conversationIndex}) async {
   // Use null-coalescing operator to ensure conversationIndex is non-null
   int safeIndex = conversationIndex ?? selectedConversationIndex;
