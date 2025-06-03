@@ -185,27 +185,35 @@ void _scrollToBottom({int? conversationIndex}) {
 }
   Widget _buildDropdown() {
     if (_chatProvider.chatTitles.isEmpty) return Container();
-    return DropdownButton<int>(
-      dropdownColor: Colors.grey[900],
-      value: selectedConversationIndex < _chatProvider.chatTitles.length
-          ? selectedConversationIndex
-          : 0,
-      icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-      onChanged: (int? newValue) {
-        if (newValue != null && newValue < _chatProvider.chatTitles.length) {
-          setState(() {
-            selectedConversationIndex = newValue;
-            _scrollToBottom();
-          });
-        }
-      },
-      items: List.generate(_chatProvider.chatTitles.length, (index) {
-        return DropdownMenuItem<int>(
-          value: index,
-          child: Text(_chatProvider.chatTitles[index],
-              style: TextStyle(color: Colors.white)),
-        );
-      }),
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: DropdownButton<int>(
+        dropdownColor: Colors.grey[800],
+        value: selectedConversationIndex < _chatProvider.chatTitles.length
+            ? selectedConversationIndex
+            : 0,
+        icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+        underline: Container(), // This removes the underline
+        onChanged: (int? newValue) {
+          if (newValue != null && newValue < _chatProvider.chatTitles.length) {
+            setState(() {
+              selectedConversationIndex = newValue;
+              _scrollToBottom();
+            });
+          }
+        },
+        items: List.generate(_chatProvider.chatTitles.length, (index) {
+          return DropdownMenuItem<int>(
+            value: index,
+            child: Text(_chatProvider.chatTitles[index],
+                style: TextStyle(color: Colors.white)),
+          );
+        }),
+      ),
     );
   }
 
@@ -315,22 +323,39 @@ void _scrollToBottom({int? conversationIndex}) {
     );
   }
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: isWebPlatform()
-        ? null
-        : AppBar(
-            title: Text('Chatbot', style: TextStyle(color: Colors.white)),
-            backgroundColor: Colors.grey[900],
-            actions: _chatProvider.conversations.isEmpty ? [] : [_buildDropdown()],
-          ),
-    body: Consumer<ChatProvider>(
-      builder: (context, chatProvider, child) {
-        return isWebPlatform() ? _buildWebLayout() : _buildMobileLayout();
-      },
-    ),
-    resizeToAvoidBottomInset: true,
-  );
-}
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: isWebPlatform()
+          ? null
+          : AppBar(
+        toolbarHeight: 100, // Increase the height of the AppBar
+        flexibleSpace: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // TuneUp logo and text
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('TuneUp', style: TextStyle(color: Colors.white, fontSize: 20)),
+                SizedBox(width: 8),
+                Image.asset('assets/logo.png', height: 30),
+              ],
+            ),
+            SizedBox(height: 10), // Space between logo and dropdown
+            // Dropdown
+            if (_chatProvider.conversations.isNotEmpty)
+              _buildDropdown(),
+          ],
+        ),
+        backgroundColor: Colors.grey[900],
+      ),
+      body: Consumer<ChatProvider>(
+        builder: (context, chatProvider, child) {
+          return isWebPlatform() ? _buildWebLayout() : _buildMobileLayout();
+        },
+      ),
+      resizeToAvoidBottomInset: true,
+    );
+  }
 }
