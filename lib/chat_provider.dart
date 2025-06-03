@@ -13,24 +13,31 @@ class ChatProvider extends ChangeNotifier {
     return chatTitles.any((title) => title.startsWith('$ticketId:'));
   }
 
-  Future<void> addNewChat(String ticketId, String userId, String symptom) async {
-    if (chatExists(ticketId)) return;
+  Future<void> addNewChat(String ticketId, String userRole, String symptom) async {
+    if (chatExists(ticketId)) {
+      return;
+    }
 
     chatTitles.add('$ticketId: $symptom');
     List<Map<String, String>> newConversation = [];
 
     try {
+      int n = userRole == 'Energy Expert' ? 1 : 2;
+
+      ticketId = ticketId.replaceAll(RegExp(r'[^0-9]'), '');
+      
       final response = await http.post(
         Uri.parse('$BASE_URL/initial_chat'),
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
         },
-        body: jsonEncode(<String, String>{
-          'ticketId': ticketId,
-          'user_id': userId,
-          'symptom': symptom,
+        body: jsonEncode({
+          'ticketId': 456,
+          'user_id': n,
         }),
       );
+      print('Sending request to: $BASE_URL/initial');
+      print('Request user: $n');
 
       if (response.statusCode == 200) {
         var responseData = jsonDecode(response.body);
@@ -39,15 +46,13 @@ class ChatProvider extends ChangeNotifier {
       } else {
         newConversation.add({
           'sender': 'bot',
-          'text':
-              'Welcome to the chat for Task #$ticketId. How can I assist you with the $symptom issue?'
+          'text': 'Chat boot failed'
         });
       }
     } catch (e) {
       newConversation.add({
         'sender': 'bot',
-        'text':
-            'Welcome to the chat for Task #$ticketId. How can I assist you with the $symptom issue?'
+        'text': 'Chat boot failed'
       });
     }
 
@@ -56,17 +61,16 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void removeResolvedChat(String ticketId) {
-    int index =
-        chatTitles.indexWhere((title) => title.startsWith('$ticketId:'));
+    int index = chatTitles.indexWhere((title) => title.startsWith('$ticketId:'));
     if (index != -1) {
       chatTitles.removeAt(index);
       conversations.removeAt(index);
       notifyListeners();
+    } else {
     }
   }
 
-  Future<void> initializeChatsFromFirestore(
-      String userRole, String userId) async {
+  Future<void> initializeChatsFromFirestore(String userRole, String userId) async {
     QuerySnapshot snapshot;
 
     if (userRole == 'Energy Expert') {
@@ -84,13 +88,11 @@ class ChatProvider extends ChangeNotifier {
       return;
     }
 
+
     for (var doc in snapshot.docs) {
       String ticketId = doc['ticketId'];
       String symptom = doc['symptom'];
-      await addNewChat(ticketId, userId, symptom);
+      await addNewChat(ticketId, userRole, symptom);
     }
   }
 }
-
-
-

@@ -20,8 +20,25 @@ class UserProvider extends ChangeNotifier {
 
       if (userDoc.exists) {
         _userRole = userDoc['role'] ?? '';
+      } else {
+        _userRole = ''; // Ensure role is empty if document doesn't exist
       }
-      notifyListeners();
+    } else {
+      _userId = '';
+      _userRole = '';
     }
+    notifyListeners();
+  }
+
+  // You can add this method if you want to set the role programmatically
+  void setUserRole(String role) {
+    _userRole = role;
+    notifyListeners();
+  }
+
+  // You can add this method if you want to set the user ID programmatically
+  void setUserId(String id) {
+    _userId = id;
+    notifyListeners();
   }
 }
