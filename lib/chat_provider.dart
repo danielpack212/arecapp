@@ -32,7 +32,7 @@ class ChatProvider extends ChangeNotifier {
           'Content-Type': 'application/json; charset=UTF-8',
         },
         body: jsonEncode({
-          'ticketId': 456,
+          'ticketId': ticketId,
           'user_id': n,
         }),
       );
