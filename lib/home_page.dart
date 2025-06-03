@@ -10,6 +10,7 @@ import 'chat_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'user_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 const String BASE_URL = 'http://192.168.204.10:5000';
 String userRole = 'm';
@@ -28,6 +29,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
   late ChatProvider _chatProvider;
+  bool _isInitialized = false; // Add this line
   int selectedConversationIndex = 0;
   bool _isListening = false;
   String _speechText = '';
@@ -39,29 +41,53 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    _initializeUserAndChats(userProvider);
-    userRole = userProvider.userRole;
-    print(userRole);
-  }
-  Future<void> _initializeUserAndChats(UserProvider userProvider) async {
-    await userProvider.fetchUserRole();
-    
-    if (userProvider.userRole.isEmpty) {
-      // You might want to set a default role here, or handle this case appropriately
-    }
-    
-    await _initializeChats(userProvider.userRole, userProvider.userId);
-    userRole = userProvider.userRole;
-    
+@override
+void initState() {
+  super.initState();
+  _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  _initializeUserAndChats(userProvider).catchError((error) {
+    print('Error in initState: $error');
     if (mounted) {
-      setState(() {});
+      setState(() {
+        _isInitialized = true; // Set to true even on error
+      });
+    }
+  });
+}
+
+Future<void> _initializeUserAndChats(UserProvider userProvider) async {
+  try {
+    await userProvider.ensureUserRoleLoaded();
+    await userProvider.fetchUserRole();
+
+    if (userProvider.userRole.isEmpty) {
+      print('No user role');
+      // Handle this case, maybe set a default role or show an error message
+    }
+
+    await _chatProvider.loadChats(userProvider.userId);
+
+    if (_chatProvider.conversations.isEmpty) {
+      await _chatProvider.initializeChatsFromFirestore(userProvider.userRole, userProvider.userId);
+    }
+    userRole = userProvider.userRole;
+
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
+    }
+  } catch (e) {
+    print('Error initializing user and chats: $e');
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
     }
   }
+}
+
   Future<void> _initializeChats(String userRole, String userId) async {
     await _chatProvider.initializeChatsFromFirestore(userRole, userId);
     if (mounted) {
@@ -72,80 +98,119 @@ class _ChatbotPageState extends State<ChatbotPage> {
   bool isWebPlatform() => kIsWeb;
 
   Future<void> _sendMessage(String message, {int? conversationIndex}) async {
-    // Use null-coalescing operator to ensure conversationIndex is non-null
-    int safeIndex = conversationIndex ?? selectedConversationIndex;
+  int safeIndex = conversationIndex ?? selectedConversationIndex;
 
-    if (message.trim().isEmpty) return;
+  // Trim whitespace from the beginning and end, but preserve newlines within the message
+  String trimmedMessage = message.trim();
+  if (trimmedMessage.isEmpty) return;
 
-    setState(() {
-      if (_chatProvider.conversations.isEmpty) {
-        _chatProvider.conversations.add([]);
-        safeIndex = 0;
+  // Add user message
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  await _chatProvider.addMessage(safeIndex, {'sender': 'user', 'text': message}, userProvider.userId);
+
+  _controller.clear();
+  _scrollToBottom(conversationIndex: safeIndex);
+
+  try {
+    String ticketId = _chatProvider.chatTitles[safeIndex].split('#').last.trim();
+    ticketId = ticketId.replaceAll(RegExp(r'[^0-9]'), '');
+    if (ticketId.isEmpty) throw Exception('Invalid ticketId');
+    
+    n = userRole == 'Energy Expert' ? 1 : 2;
+    
+    final requestBody = jsonEncode({'text': message, 'ticketId': ticketId, 'User': n});
+    print('Sending request to: $BASE_URL/chat');
+    print('Request body: $requestBody');
+
+    final response = await http.post(
+      Uri.parse('$BASE_URL/chat'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+      },
+      body: requestBody,
+    ).timeout(Duration(seconds: 30));
+
+    print('Response status code: ${response.statusCode}');
+    print('Response headers: ${response.headers}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      var responseData = jsonDecode(response.body);
+      
+      // Add bot message
+      await _chatProvider.addMessage(safeIndex, {'sender': 'bot', 'text': responseData['answer']},userProvider.userId);
+
+      // Check if the message was 'exit' and handle accordingly
+      if (message.toLowerCase() == 'exit') {
+        String summary = responseData['summary']; // Capture the summary
+        await _resolveChat(ticketId, summary);
       }
-
-      // Ensure we're working with the correct conversation
-      if (safeIndex >= _chatProvider.conversations.length) {
-        safeIndex = _chatProvider.conversations.length - 1;
-      }
-
-      // Add the user's message to the specific conversation
-      _chatProvider.conversations[safeIndex]
-          .add({'sender': 'user', 'text': message});
-    });
-
-    _controller.clear();
-    _scrollToBottom(conversationIndex: safeIndex);
-
-    try {
-      String ticketId =
-          _chatProvider.chatTitles[safeIndex].split('#').last.trim();
-      ticketId = ticketId.replaceAll(RegExp(r'[^0-9]'), '');
-      if (ticketId.isEmpty) throw Exception('Invalid ticketId');
-      if (userRole == 'Energy Expert') {
-        n = 1;
-      } else {
-        n = 2;
-      }
-      final requestBody =
-          jsonEncode({'text': message, 'ticketId': ticketId, 'User': n});
-      print('Sending request to: $BASE_URL/chat');
-      print('Request body: $requestBody');
-
-      final response = await http
-          .post(
-            Uri.parse('$BASE_URL/chat'),
-            headers: {
-              'Content-Type': 'application/json; charset=UTF-8',
-              'Accept': 'application/json',
-            },
-            body: requestBody,
-          )
-          .timeout(Duration(seconds: 30));
-
-      print('Response status code: ${response.statusCode}');
-      print('Response headers: ${response.headers}');
-      print('Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        var responseData = jsonDecode(response.body);
-        setState(() {
-          _chatProvider.conversations[safeIndex]
-              .add({'sender': 'bot', 'text': responseData['answer']});
-        });
-      } else {
-        throw Exception(
-            'Server responded with status code: ${response.statusCode}. Body: ${response.body}');
-      }
-    } catch (e) {
-      print('Error in _sendMessage: $e');
-      setState(() {
-        _chatProvider.conversations[safeIndex].add(
-            {'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'});
-      });
+    } else {
+      throw Exception('Server responded with status code: ${response.statusCode}. Body: ${response.body}');
     }
+  } catch (e) {
+    print('Error in _sendMessage: $e');
+    await _chatProvider.addMessage(safeIndex, {'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'},userProvider.userId);
+  }
 
-    _scrollToBottom(conversationIndex: safeIndex);
-    _chatProvider.notifyListeners();
+  _scrollToBottom(conversationIndex: safeIndex);
+  setState(() {}); // Trigger a rebuild of the UI
+}
+
+  Future<void> _resolveChat(String ticketId, String summary) async {
+    try {
+      // Update Firebase status
+      if (userRole == 'Maintenance Technician') {
+        await _updateFirebaseStatus(ticketId, summary, 2);
+      } else {
+        await _updateFirebaseStatus(ticketId, summary, 1);
+      }
+      // Remove the chat from the provider
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      _chatProvider.removeResolvedChat(ticketId,userProvider.userId);
+
+      // Update the UI
+      setState(() {
+        if (_chatProvider.conversations.isEmpty) {
+          _chatProvider.conversations.add([
+            {'sender': 'bot', 'text': 'All tasks resolved. Great job!'}
+          ]);
+          selectedConversationIndex = 0;
+        } else if (selectedConversationIndex >=
+            _chatProvider.conversations.length) {
+          selectedConversationIndex = _chatProvider.conversations.length - 1;
+        }
+      });
+
+      print('Chat resolved and removed for ticket $ticketId');
+    } catch (e) {
+      print('Error resolving chat: $e');
+    }
+  }
+
+  Future<void> _updateFirebaseStatus(
+      String ticketId, String summary, int user) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('tasks')
+          .where('ticketId', isEqualTo: ticketId)
+          .get()
+          .then((querySnapshot) {
+        for (var doc in querySnapshot.docs) {
+          if (user == 1) {
+          } else if (user == 2) {
+            doc.reference.update({'status': 'Resolved'});
+            doc.reference.update({'Maintenance Summary': summary});
+
+
+          }
+        }
+      });
+      print('Updated Firebase status for ticket $ticketId');
+    } catch (e) {
+      print('Error updating Firebase status: $e');
+    }
   }
 
   void _scrollToBottom({int? conversationIndex}) {
@@ -273,17 +338,25 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   Widget _buildInputArea() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      color: Colors.grey[900],
-      child: Row(
-        children: [
-          Expanded(
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    color: Colors.grey[900],
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end, // Align items to the bottom
+      children: [
+        Expanded(
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: 150, // Set a maximum height for the input area
+            ),
             child: TextField(
               controller: _controller,
               onSubmitted: (text) => _sendMessage(text,
                   conversationIndex: selectedConversationIndex),
               style: TextStyle(color: Colors.white),
+              maxLines: null, // Allow multiple lines
+              keyboardType: TextInputType.multiline, // Enable multiline input
+              textInputAction: TextInputAction.newline, // Add new line on enter
               decoration: InputDecoration(
                 hintText: 'Type your message...',
                 hintStyle: TextStyle(color: Colors.grey[400]),
@@ -293,25 +366,26 @@ class _ChatbotPageState extends State<ChatbotPage> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
             ),
           ),
-          SizedBox(width: 8),
-          IconButton(
-            icon: Icon(Icons.mic,
-                color: _isListening ? Colors.red : Colors.white),
-            onPressed: _isListening ? _stopListening : _startListening,
-          ),
-          IconButton(
-            icon: Icon(Icons.send, color: Colors.white),
-            onPressed: () => _sendMessage(_controller.text,
-                conversationIndex: selectedConversationIndex),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+        SizedBox(width: 8),
+        IconButton(
+          icon: Icon(Icons.mic,
+              color: _isListening ? Colors.red : Colors.white),
+          onPressed: _isListening ? _stopListening : _startListening,
+        ),
+        IconButton(
+          icon: Icon(Icons.send, color: Colors.white),
+          onPressed: () => _sendMessage(_controller.text,
+              conversationIndex: selectedConversationIndex),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildMobileLayout() {
     return Column(
@@ -382,12 +456,23 @@ class _ChatbotPageState extends State<ChatbotPage> {
               ),
               backgroundColor: Colors.grey[900],
             ),
-      body: Consumer<ChatProvider>(
-        builder: (context, chatProvider, child) {
-          return isWebPlatform() ? _buildWebLayout() : _buildMobileLayout();
-        },
-      ),
-      resizeToAvoidBottomInset: true,
+      body: _isInitialized
+        ? Consumer<ChatProvider>(
+            builder: (context, chatProvider, child) {
+              return isWebPlatform() ? _buildWebLayout() : _buildMobileLayout();
+            },
+          )
+        : Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 20),
+                Text("Initializing... Please wait."),
+              ],
+            ),
+          ),
+    resizeToAvoidBottomInset: true,
     );
   }
 }

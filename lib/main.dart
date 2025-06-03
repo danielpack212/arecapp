@@ -57,12 +57,16 @@ Future<void> main() async {
       }
     }
   }
-
+  final chatProvider = ChatProvider();
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    await chatProvider.loadChats(user.uid);
+  }
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => UserProvider()),
-        ChangeNotifierProvider(create: (context) => ChatProvider()),
+        ChangeNotifierProvider.value(value: chatProvider),
         Provider<NotificationService>.value(value: notificationService),
       ],
       child: MyApp(),

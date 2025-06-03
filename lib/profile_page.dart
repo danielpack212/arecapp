@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'chat_provider.dart'; // Make sure this path is correct
+import 'package:provider/provider.dart';
+import 'user_provider.dart';  // Add this line, make sure the path is correct
+
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -26,7 +30,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _fetchUserData() async {
     if (user != null) {
-      DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user!.uid).get();
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
       Map<String, dynamic>? userData = doc.data() as Map<String, dynamic>?;
       if (userData != null) {
         setState(() {
@@ -48,7 +55,8 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: isWeb
           ? null
           : AppBar(
-              title: Text('Profile Page', style: TextStyle(color: Colors.white)),
+              title:
+                  Text('Profile Page', style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.grey[900],
               centerTitle: true,
             ),
@@ -76,7 +84,8 @@ class _ProfilePageState extends State<ProfilePage> {
                               child: CircleAvatar(
                                 radius: 50,
                                 backgroundColor: Colors.grey[300],
-                                child: Icon(Icons.person, size: 50, color: Colors.grey[700]),
+                                child: Icon(Icons.person,
+                                    size: 50, color: Colors.grey[700]),
                               ),
                             ),
                             SizedBox(height: 20),
@@ -97,7 +106,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                   _selectedRole = newValue;
                                 });
                               },
-                              items: _roles.map<DropdownMenuItem<String>>((String value) {
+                              items: _roles.map<DropdownMenuItem<String>>(
+                                  (String value) {
                                 return DropdownMenuItem<String>(
                                   value: value,
                                   child: Text(value),
@@ -108,20 +118,26 @@ class _ProfilePageState extends State<ProfilePage> {
                             SizedBox(height: 24),
                             ElevatedButton(
                               onPressed: () async {
-                                await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({
+                                await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(user!.uid)
+                                    .update({
                                   'name': _nameController.text,
                                   'phone': _phoneController.text,
                                   'role': _selectedRole,
                                 });
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Profile updated successfully')),
+                                  SnackBar(
+                                      content:
+                                          Text('Profile updated successfully')),
                                 );
                               },
                               child: Text('Update Profile'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.grey[900],
                                 foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 40, vertical: 14),
                                 minimumSize: Size(double.infinity, 50),
                               ),
                             ),
@@ -132,12 +148,17 @@ class _ProfilePageState extends State<ProfilePage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.redAccent,
                                 foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 10),
                                 minimumSize: Size(double.infinity, 50),
                               ),
                               onPressed: () async {
+                                final userProvider = Provider.of<UserProvider>(context, listen: false);
+                                await Provider.of<ChatProvider>(context,listen: false)
+                                    .clearChats(userProvider.userId);
                                 await FirebaseAuth.instance.signOut();
-                                Navigator.of(context).pushReplacementNamed('/login');
+                                Navigator.of(context)
+                                    .pushReplacementNamed('/login');
                               },
                             ),
                           ],

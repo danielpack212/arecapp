@@ -177,99 +177,7 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
   String sortBy = 'Date Opened';
   bool sortAscending = true;
 
-  List<Map<String, dynamic>> dummyData = [
-    {
-      'symptom': 'Pipe Burst',
-      'classification': 'Plumbing',
-      'subSymptoms': [
-        {'name': 'Excess Consumption', 'percentage': 20},
-        {'name': 'Loose Fittings', 'percentage': 8},
-      ],
-      'location': 'Hofburg',
-      'status': 'Action Required',
-      'technician': 'Unassigned',
-      'technicianOptions': [
-        'Ethan R., Manager',
-        'Michael S., Technician',
-        'Any Available'
-      ],
-      'dateOpened': '16-04-2025',
-      'ticketId': 'CTH178',
-      'isExpanded': false,
-    },
-    {
-      'symptom': 'Electrical Shortage',
-      'classification': 'Electrical',
-      'subSymptoms': [
-        {'name': 'Overloaded Circuit', 'percentage': 30},
-        {'name': 'Faulty Wiring', 'percentage': 15},
-      ],
-      'location': 'TUWien',
-      'status': 'Resolved',
-      'technician': 'Mark G.',
-      'technicianOptions': [
-        'Mark G.',
-        'Sarah L., Electrician',
-        'Any Available'
-      ],
-      'dateOpened': '04-04-2025',
-      'ticketId': 'CTH179',
-      'isExpanded': false,
-    },
-    {
-      'symptom': 'AC Malfunction',
-      'classification': 'HVAC',
-      'subSymptoms': [
-        {'name': 'Insufficient Cooling', 'percentage': 40},
-        {'name': 'Strange Noise', 'percentage': 10},
-      ],
-      'location': 'Hofburg',
-      'status': 'In Progress',
-      'assignedBy': 'Alice Johnson (Energy Expert)',
-      'technicianOptions': ['Bob K., HVAC Specialist', 'Any Available'],
-      'dateOpened': '10-04-2025',
-      'ticketId': 'CTH180',
-      'isExpanded': false,
-    },
-    {
-      'symptom': 'Lighting Failure',
-      'classification': 'Electrical',
-      'subSymptoms': [
-        {'name': 'Flickering Lights', 'percentage': 25},
-        {'name': 'Dead Bulbs', 'percentage': 75},
-      ],
-      'location': 'TUWien',
-      'status': 'Action Required',
-      'assignedBy': 'Unassigned',
-      'technicianOptions': [
-        'Sarah L., Electrician',
-        'Mark G.',
-        'Any Available'
-      ],
-      'dateOpened': '12-04-2025',
-      'ticketId': 'CTH181',
-      'isExpanded': false,
-    },
-    {
-      'symptom': 'Water Heater Leak',
-      'classification': 'Plumbing',
-      'subSymptoms': [
-        {'name': 'Puddle Formation', 'percentage': 60},
-        {'name': 'Reduced Hot Water', 'percentage': 40},
-      ],
-      'location': 'Hofburg',
-      'status': 'In Progress',
-      'assignedBy': 'John Doe (Energy Expert)',
-      'technicianOptions': [
-        'Michael S., Technician',
-        'Ethan R., Manager',
-        'Any Available'
-      ],
-      'dateOpened': '14-04-2025',
-      'ticketId': 'CTH182',
-      'isExpanded': false,
-    },
-  ];
+  List<Map<String, dynamic>> dummyData = [  ];
 
 
 void _listenForNewTasks() {
@@ -291,7 +199,7 @@ void _listenForNewTasks() {
         String ticketId = change.doc['ticketId'];
         String symptom = change.doc['symptom'] ?? 'Unknown issue';
         if (!_chatProvider.chatExists(ticketId)) {
-          _chatProvider.addNewChat(ticketId,userId, symptom);
+          _chatProvider.addNewChat(ticketId,userId, symptom, userId);
         }
       }
     }
@@ -305,7 +213,6 @@ void _listenForNewTasks() {
   @override
   void initState() {
     super.initState();
-    initializeFirestoreWithDummyData();
     WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -332,7 +239,7 @@ void _initializeChatsFromFirestore() async {
     String ticketId = doc['ticketId'];
     String symptom = doc['symptom'] ?? 'Unknown issue';
     if (!_chatProvider.chatExists(ticketId)) {
-      await _chatProvider.addNewChat(ticketId, userId, symptom);
+      await _chatProvider.addNewChat(ticketId, userId, symptom, userId);
     }
   }
 }
@@ -351,15 +258,6 @@ void _initializeChatsFromFirestore() async {
   }
 
   Future<void> initializeFirestoreWithDummyData() async {
-    bool tasksExist = await tasksExistInFirestore();
-    if (!tasksExist) {
-      for (var task in dummyData) {
-        await addTaskToFirebase(task);
-      }
-      print('Dummy data added to Firestore');
-    } else {
-      print('Tasks already exist in Firestore');
-    }
   }
 
   Future<void> addTaskToFirebase(Map<String, dynamic> taskData) async {
@@ -390,16 +288,16 @@ void _initializeChatsFromFirestore() async {
   void createNewChatTab(String ticketId, String symptom, String userId) {
     // You'll need to implement a way to communicate between pages
     // One way is to use a global state management solution like Provider
-    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,userId, symptom);
+    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,userId, symptom,userId);
   }
 
 // close chat
-  void checkAndRemoveResolvedChats(List<Map<String, dynamic>> tasks) {
+  void checkAndRemoveResolvedChats(List<Map<String, dynamic>> tasks, String userId) {
     for (var task in tasks) {
       if (task['status'] == 'Resolved') {
         String ticketId = task['ticketId'];
         Provider.of<ChatProvider>(context, listen: false)
-            .removeResolvedChat(ticketId);
+            .removeResolvedChat(ticketId,userId);
       }
     }
   }
@@ -941,7 +839,8 @@ Widget _buildMobileTableRow(Map<String, dynamic> data, String? userRole) {
             .toList();
 
         // Check and remove resolved chats
-        checkAndRemoveResolvedChats(tasks);
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        checkAndRemoveResolvedChats(tasks, userProvider.userId);
 
         if (userRole == 'Maintenance Technician') {
           String currentUserUid = FirebaseAuth.instance.currentUser!.uid;
@@ -1370,7 +1269,8 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
       });
 
       // Create a new chat for this task
-      Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,technician,symptom);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,technician,symptom,userProvider.userId);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('New task created successfully')),
@@ -1969,7 +1869,7 @@ Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechni
         'assignedBy': null,
       };
     } else {
-      // Fetch technician data (consider caching this data if it's accessed frequently)
+      // Fetch technician data
       QuerySnapshot technicianSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .where('name', isEqualTo: selectedTechnician)
@@ -1996,14 +1896,32 @@ Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechni
     // Commit the batch
     await batch.commit();
 
+    // Show success message immediately after successful update
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(selectedTechnician == null
+            ? 'Task unassigned'
+            : 'Task assigned to $selectedTechnician')),
+      );
+    }
+
     // If a technician was assigned, send a notification and create a chat
     if (technicianUid != null) {
-      // Use a separate async call for notification to not block the UI
-      _sendNotificationToTechnician(technicianUid, data['ticketId'], data['symptom']);
+      try {
+        await _sendNotificationToTechnician(technicianUid, data['ticketId'], data['symptom']);
+      } catch (e) {
+        print('Error sending notification: $e');
+        // Optionally show a warning, but don't treat it as a failure
+      }
       
-      // Create a new chat for the assigned technician
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      await chatProvider.addNewChat(data['ticketId'], data['userId'], data['symptom']);
+      try {
+        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        await chatProvider.addNewChat(data['ticketId'], technicianUid, data['symptom'],userProvider.userId);
+      } catch (e) {
+        print('Error creating chat: $e');
+        // Optionally show a warning, but don't treat it as a failure
+      }
     }
 
     // Update UI
@@ -2011,18 +1929,12 @@ Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechni
       setState(() {
         // Update your local state here if necessary
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(selectedTechnician == null
-            ? 'Task unassigned'
-            : 'Task assigned to $selectedTechnician')),
-      );
     }
   } catch (e) {
     print('Error assigning/unassigning technician: $e');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to assign/unassign technician')),
+        SnackBar(content: Text('Error: ${e.toString()}')),
       );
     }
   }

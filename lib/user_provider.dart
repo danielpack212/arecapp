@@ -5,9 +5,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class UserProvider extends ChangeNotifier {
   String _userRole = '';
   String _userId = '';
+  bool _isLoaded = false;
 
   String get userRole => _userRole;
   String get userId => _userId;
+
+  Future<void> ensureUserRoleLoaded() async {
+    if (!_isLoaded) {
+      await fetchUserRole();
+      _isLoaded = true;
+    }
+  }
 
   Future<void> fetchUserRole() async {
     User? user = FirebaseAuth.instance.currentUser;
@@ -27,6 +35,7 @@ class UserProvider extends ChangeNotifier {
       _userId = '';
       _userRole = '';
     }
+    _isLoaded = true;
     notifyListeners();
   }
 
@@ -40,5 +49,10 @@ class UserProvider extends ChangeNotifier {
   void setUserId(String id) {
     _userId = id;
     notifyListeners();
+  }
+
+  // Add this method to reset the loaded state if needed
+  void resetLoadedState() {
+    _isLoaded = false;
   }
 }
