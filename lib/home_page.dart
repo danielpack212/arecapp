@@ -19,7 +19,6 @@ int n = 0;
 class ChatbotPage extends StatefulWidget {
   final String? initialTicketId; // Add this parameter
   const ChatbotPage({Key? key, this.initialTicketId}) : super(key: key);
-  
 
   @override
   _ChatbotPageState createState() => _ChatbotPageState();
@@ -43,22 +42,22 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
   }
 
-@override
-void initState() {
-  super.initState();
-  _chatProvider = Provider.of<ChatProvider>(context, listen: false);
-  final userProvider = Provider.of<UserProvider>(context, listen: false);
-  _initializeUserAndChats(userProvider).then((_) {
-    _setupFirebaseListener(userProvider.userId);
-  }).catchError((error) {
-    print('Error in initState: $error');
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
-    }
-  });
-}
+  @override
+  void initState() {
+    super.initState();
+    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    _initializeUserAndChats(userProvider).then((_) {
+      _setupFirebaseListener(userProvider.userId);
+    }).catchError((error) {
+      print('Error in initState: $error');
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    });
+  }
 
   Future<void> _initializeUserAndChats(UserProvider userProvider) async {
     try {
@@ -101,23 +100,24 @@ void initState() {
   }
 
   void _setupFirebaseListener(String userId) {
-  FirebaseFirestore.instance
-      .collection('tasks')
-      .where('assignedTo', isEqualTo: userId)
-      .snapshots()
-      .listen((snapshot) {
-    for (var change in snapshot.docChanges) {
-      if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
-        String ticketId = change.doc['ticketId'];
-        String symptom = change.doc['symptom'];
-        String status = change.doc['status'];
-        if (status != 'Resolved' && !_chatProvider.chatExists(ticketId)) {
-          _chatProvider.addNewChat(ticketId, userRole, symptom, userId);
+    FirebaseFirestore.instance
+        .collection('tasks')
+        .where('assignedTo', isEqualTo: userId)
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added ||
+            change.type == DocumentChangeType.modified) {
+          String ticketId = change.doc['ticketId'];
+          String symptom = change.doc['symptom'];
+          String status = change.doc['status'];
+          if (status != 'Resolved' && !_chatProvider.chatExists(ticketId)) {
+            _chatProvider.addNewChat(ticketId, userRole, symptom, userId);
+          }
         }
       }
-    }
-  });
-}
+    });
+  }
 
   bool isWebPlatform() => kIsWeb;
 
@@ -195,7 +195,7 @@ void initState() {
     setState(() {}); // Trigger a rebuild of the UI
   }
 
-Future<void> _resolveChat(String ticketId, String summary) async {
+ Future<void> _resolveChat(String ticketId, String summary) async {
   try {
     if (userRole == 'Maintenance Technician') {
       await _updateFirebaseStatus(ticketId, summary, 2);
@@ -206,23 +206,10 @@ Future<void> _resolveChat(String ticketId, String summary) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     await _chatProvider.removeResolvedChat(ticketId, userProvider.userId);
 
-    // Use a callback to update the state after the current build is complete
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        if (_chatProvider.conversations.isEmpty) {
-          selectedConversationIndex = -1; // No active conversation
-        } else {
-          selectedConversationIndex = 0; // Select the first available conversation
-        }
-      });
-    });
-
-    print('Chat resolved and removed for ticket $ticketId');
-
     // Show a dialog indicating completion
-    showDialog(
+    await showDialog(
       context: context,
-      barrierDismissible: false, // Prevent dismissing the dialog by tapping outside
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text("Chat Resolved"),
@@ -232,7 +219,14 @@ Future<void> _resolveChat(String ticketId, String summary) async {
               child: Text("OK"),
               onPressed: () {
                 Navigator.of(context).pop(); // Close the dialog
-                Navigator.of(context).pop(); // Return to the previous screen
+                setState(() {
+                  // Reset the selected conversation index if needed
+                  if (_chatProvider.conversations.isEmpty) {
+                    selectedConversationIndex = -1;
+                  } else {
+                    selectedConversationIndex = 0;
+                  }
+                });
               },
             ),
           ],
@@ -261,19 +255,19 @@ Future<void> _resolveChat(String ticketId, String summary) async {
         }
       });
 
-          // Also update the user's chats collection
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userProvider.userId)
-        .collection('chats')
-        .where('ticketId', isEqualTo: ticketId)
-        .get()
-        .then((querySnapshot) {
-      for (var doc in querySnapshot.docs) {
-        doc.reference.update({'status': 'Resolved'});
-      }
-    });
+      // Also update the user's chats collection
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userProvider.userId)
+          .collection('chats')
+          .where('ticketId', isEqualTo: ticketId)
+          .get()
+          .then((querySnapshot) {
+        for (var doc in querySnapshot.docs) {
+          doc.reference.update({'status': 'Resolved'});
+        }
+      });
       print('Updated Firebase status for ticket $ticketId');
     } catch (e) {
       print('Error updating Firebase status: $e');
@@ -389,6 +383,9 @@ Future<void> _resolveChat(String ticketId, String summary) async {
                 style: TextStyle(color: Colors.black)),
           );
         }
+        if (selectedConversationIndex >= chatProvider.conversations.length) {
+        selectedConversationIndex = 0;
+        }
 
         List<Map<String, String>> currentConversation =
             chatProvider.conversations[selectedConversationIndex];
@@ -456,20 +453,14 @@ Future<void> _resolveChat(String ticketId, String summary) async {
     );
   }
 
-  Widget _buildMobileLayout() {
-    return Column(
-      children: [
-        Expanded(
-          child: _chatProvider.conversations.isEmpty
-              ? Center(
-                  child: Text("No conversations available.",
-                      style: TextStyle(color: Colors.black)))
-              : _buildChatList(),
-        ),
-        _buildInputArea(),
-      ],
-    );
-  }
+Widget _buildMobileLayout() {
+  return Column(
+    children: [
+      Expanded(child: _buildChatList()),
+      _buildInputArea(),
+    ],
+  );
+}
 
   Widget _buildWebLayout() {
     return Row(
@@ -526,11 +517,13 @@ Future<void> _resolveChat(String ticketId, String summary) async {
               backgroundColor: Colors.grey[900],
             ),
       body: _isInitialized
-        ? Consumer<ChatProvider>(
-            builder: (context, chatProvider, child) {
-              return isWebPlatform() ? _buildWebLayout() : _buildMobileLayout();
-            },
-          )
+          ? Consumer<ChatProvider>(
+              builder: (context, chatProvider, child) {
+                return isWebPlatform()
+                    ? _buildWebLayout()
+                    : _buildMobileLayout();
+              },
+            )
           : Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
