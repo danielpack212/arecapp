@@ -17,7 +17,7 @@ class _SignUpPageState extends State<SignUpPage> {
   String? _selectedRole;
   String? _selectedBuilding;
   final List<String> _roles = ['Maintenance Technician', 'Energy Expert'];
-  final List<String> _buildings = ['Hofburg', 'TUWien', 'The Loft'];
+  final List<String> _buildings = ['Hofburg', 'TUWien', 'The Loft','Freihaus'];
 
   bool _obscurePassword = true;
   String error = '';

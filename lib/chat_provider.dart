@@ -137,7 +137,7 @@ class ChatProvider extends ChangeNotifier {
     if (userRole == 'Energy Expert') {
       snapshot = await FirebaseFirestore.instance
           .collection('tasks')
-          .where('status', isEqualTo: 'Unassigned')
+          .where('assignedBy', isEqualTo: 'Unassigned')
           .get();
     } else if (userRole == 'Maintenance Technician') {
       snapshot = await FirebaseFirestore.instance

@@ -194,7 +194,7 @@ void _listenForNewTasks() {
 
   } else {
     // For Energy Experts, listen for all new tasks that are not resolved
-    query = query.where('status', isEqualTo: 'Unassigned');
+    query = query.where('assignedBy', isEqualTo: 'Unassigned');
   }
 
   _taskSubscription = query.snapshots().listen((snapshot) {
