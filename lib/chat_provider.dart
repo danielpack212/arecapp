@@ -23,16 +23,23 @@ Future<void> clearChats(String userId) async {
 }
 Future<void> loadChats(String userId) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  chatTitles = prefs.getStringList('chatTitles_$userId') ?? [];
-  String? conversationsJson = prefs.getString('conversations_$userId');
-  if (conversationsJson != null) {
-    List<dynamic> decodedList = json.decode(conversationsJson);
-    conversations = decodedList.map((item) => 
-      (item as List).map((conv) => Map<String, String>.from(conv)).toList()
-    ).toList();
-  } else {
-    conversations.clear();
+  
+  // Load from Firestore instead of SharedPreferences
+  QuerySnapshot snapshot = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(userId)
+      .collection('chats')
+      .where('status', isNotEqualTo: 'Resolved')
+      .get();
+
+  chatTitles.clear();
+  conversations.clear();
+
+  for (var doc in snapshot.docs) {
+    chatTitles.add(doc['title']);
+    conversations.add(List<Map<String, String>>.from(doc['messages']));
   }
+
   notifyListeners();
 }
 
@@ -90,14 +97,26 @@ Future<void> saveChats(String userId) async {
     notifyListeners();
   }
 
-  void removeResolvedChat(String ticketId,String userId) {
-    int index = chatTitles.indexWhere((title) => title.startsWith('$ticketId:'));
-    if (index != -1) {
-      chatTitles.removeAt(index);
-      conversations.removeAt(index);
-      saveChats(userId);
+    Future<void> removeResolvedChat(String ticketId, String userId) async {
+    int indexToRemove = chatTitles.indexWhere((title) => title.contains(ticketId));
+    if (indexToRemove != -1) {
+      chatTitles.removeAt(indexToRemove);
+      conversations.removeAt(indexToRemove);
       notifyListeners();
-    } 
+
+      // Remove the chat from Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('chats')
+          .where('ticketId', isEqualTo: ticketId)
+          .get()
+          .then((snapshot) {
+        for (DocumentSnapshot doc in snapshot.docs) {
+          doc.reference.update({'status': 'Resolved'});
+        }
+      });
+    }
   }
 
   Future<void> addMessage(int conversationIndex, Map<String, String> message, String userId) async {
@@ -120,7 +139,7 @@ Future<void> saveChats(String userId) async {
       } else if (userRole == 'Maintenance Technician') {
         snapshot = await FirebaseFirestore.instance
             .collection('tasks')
-            .where('status', isNotEqualTo: 'Resolved')
+            .where('status', isNotEqualTo: 'Resolved')  // Add this line
             .where('assignedTo', isEqualTo: userId)
             .get();
       } else {

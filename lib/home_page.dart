@@ -17,7 +17,9 @@ String userRole = 'm';
 int n = 0;
 
 class ChatbotPage extends StatefulWidget {
-  const ChatbotPage({Key? key}) : super(key: key);
+  final String? initialTicketId; // Add this parameter
+  const ChatbotPage({Key? key, this.initialTicketId}) : super(key: key);
+  
 
   @override
   _ChatbotPageState createState() => _ChatbotPageState();
@@ -41,52 +43,53 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
   }
 
-@override
-void initState() {
-  super.initState();
-  _chatProvider = Provider.of<ChatProvider>(context, listen: false);
-  final userProvider = Provider.of<UserProvider>(context, listen: false);
-  _initializeUserAndChats(userProvider).catchError((error) {
-    print('Error in initState: $error');
-    if (mounted) {
-      setState(() {
-        _isInitialized = true; // Set to true even on error
-      });
-    }
-  });
-}
+  @override
+  void initState() {
+    super.initState();
+    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    _initializeUserAndChats(userProvider).catchError((error) {
+      print('Error in initState: $error');
+      if (mounted) {
+        setState(() {
+          _isInitialized = true; // Set to true even on error
+        });
+      }
+    });
+  }
 
-Future<void> _initializeUserAndChats(UserProvider userProvider) async {
-  try {
-    await userProvider.ensureUserRoleLoaded();
-    await userProvider.fetchUserRole();
+  Future<void> _initializeUserAndChats(UserProvider userProvider) async {
+    try {
+      await userProvider.ensureUserRoleLoaded();
+      await userProvider.fetchUserRole();
 
-    if (userProvider.userRole.isEmpty) {
-      print('No user role');
-      // Handle this case, maybe set a default role or show an error message
-    }
+      if (userProvider.userRole.isEmpty) {
+        print('No user role');
+        // Handle this case, maybe set a default role or show an error message
+      }
 
-    await _chatProvider.loadChats(userProvider.userId);
+      await _chatProvider.loadChats(userProvider.userId);
 
-    if (_chatProvider.conversations.isEmpty) {
-      await _chatProvider.initializeChatsFromFirestore(userProvider.userRole, userProvider.userId);
-    }
-    userRole = userProvider.userRole;
+      if (_chatProvider.conversations.isEmpty) {
+        await _chatProvider.initializeChatsFromFirestore(
+            userProvider.userRole, userProvider.userId);
+      }
+      userRole = userProvider.userRole;
 
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
-    }
-  } catch (e) {
-    print('Error initializing user and chats: $e');
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    } catch (e) {
+      print('Error initializing user and chats: $e');
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
     }
   }
-}
 
   Future<void> _initializeChats(String userRole, String userId) async {
     await _chatProvider.initializeChatsFromFirestore(userRole, userId);
@@ -98,96 +101,127 @@ Future<void> _initializeUserAndChats(UserProvider userProvider) async {
   bool isWebPlatform() => kIsWeb;
 
   Future<void> _sendMessage(String message, {int? conversationIndex}) async {
-  int safeIndex = conversationIndex ?? selectedConversationIndex;
+    int safeIndex = conversationIndex ?? selectedConversationIndex;
 
-  // Trim whitespace from the beginning and end, but preserve newlines within the message
-  String trimmedMessage = message.trim();
-  if (trimmedMessage.isEmpty) return;
+    // Trim whitespace from the beginning and end, but preserve newlines within the message
+    String trimmedMessage = message.trim();
+    if (trimmedMessage.isEmpty) return;
 
-  // Add user message
-  final userProvider = Provider.of<UserProvider>(context, listen: false);
-  await _chatProvider.addMessage(safeIndex, {'sender': 'user', 'text': message}, userProvider.userId);
+    // Add user message
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    await _chatProvider.addMessage(
+        safeIndex, {'sender': 'user', 'text': message}, userProvider.userId);
 
-  _controller.clear();
-  _scrollToBottom(conversationIndex: safeIndex);
+    _controller.clear();
+    _scrollToBottom(conversationIndex: safeIndex);
 
-  try {
-    String ticketId = _chatProvider.chatTitles[safeIndex].split('#').last.trim();
-    ticketId = ticketId.replaceAll(RegExp(r'[^0-9]'), '');
-    if (ticketId.isEmpty) throw Exception('Invalid ticketId');
-    
-    n = userRole == 'Energy Expert' ? 1 : 2;
-    
-    final requestBody = jsonEncode({'text': message, 'ticketId': ticketId, 'User': n});
-    print('Sending request to: $BASE_URL/chat');
-    print('Request body: $requestBody');
+    try {
+      String ticketId =
+          _chatProvider.chatTitles[safeIndex].split('#').last.trim();
+      ticketId = ticketId.replaceAll(RegExp(r'[^0-9]'), '');
+      if (ticketId.isEmpty) throw Exception('Invalid ticketId');
 
-    final response = await http.post(
-      Uri.parse('$BASE_URL/chat'),
-      headers: {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Accept': 'application/json',
-      },
-      body: requestBody,
-    ).timeout(Duration(seconds: 30));
+      n = userRole == 'Energy Expert' ? 1 : 2;
 
-    print('Response status code: ${response.statusCode}');
-    print('Response headers: ${response.headers}');
-    print('Response body: ${response.body}');
+      final requestBody =
+          jsonEncode({'text': message, 'ticketId': ticketId, 'User': n});
+      print('Sending request to: $BASE_URL/chat');
+      print('Request body: $requestBody');
 
-    if (response.statusCode == 200) {
-      var responseData = jsonDecode(response.body);
-      
-      // Add bot message
-      await _chatProvider.addMessage(safeIndex, {'sender': 'bot', 'text': responseData['answer']},userProvider.userId);
+      final response = await http
+          .post(
+            Uri.parse('$BASE_URL/chat'),
+            headers: {
+              'Content-Type': 'application/json; charset=UTF-8',
+              'Accept': 'application/json',
+            },
+            body: requestBody,
+          )
+          .timeout(Duration(seconds: 30));
 
-      // Check if the message was 'exit' and handle accordingly
-      if (message.toLowerCase() == 'exit') {
-        String summary = responseData['summary']; // Capture the summary
-        await _resolveChat(ticketId, summary);
+      print('Response status code: ${response.statusCode}');
+      print('Response headers: ${response.headers}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        var responseData = jsonDecode(response.body);
+
+        // Add bot message
+        await _chatProvider.addMessage(
+            safeIndex,
+            {'sender': 'bot', 'text': responseData['answer']},
+            userProvider.userId);
+
+        // Check if the message was 'exit' and handle accordingly
+        if (message.toLowerCase() == 'exit') {
+          String summary = responseData['summary']; // Capture the summary
+          await _resolveChat(ticketId, summary);
+          return;
+        }
+      } else {
+        throw Exception(
+            'Server responded with status code: ${response.statusCode}. Body: ${response.body}');
       }
-    } else {
-      throw Exception('Server responded with status code: ${response.statusCode}. Body: ${response.body}');
+    } catch (e) {
+      print('Error in _sendMessage: $e');
+      await _chatProvider.addMessage(
+          safeIndex,
+          {'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'},
+          userProvider.userId);
     }
-  } catch (e) {
-    print('Error in _sendMessage: $e');
-    await _chatProvider.addMessage(safeIndex, {'sender': 'bot', 'text': 'Sorry, I encountered an error: $e'},userProvider.userId);
+
+    _scrollToBottom(conversationIndex: safeIndex);
+    setState(() {}); // Trigger a rebuild of the UI
   }
 
-  _scrollToBottom(conversationIndex: safeIndex);
-  setState(() {}); // Trigger a rebuild of the UI
-}
+Future<void> _resolveChat(String ticketId, String summary) async {
+  try {
+    if (userRole == 'Maintenance Technician') {
+      await _updateFirebaseStatus(ticketId, summary, 2);
+    } else {
+      await _updateFirebaseStatus(ticketId, summary, 1);
+    }
 
-  Future<void> _resolveChat(String ticketId, String summary) async {
-    try {
-      // Update Firebase status
-      if (userRole == 'Maintenance Technician') {
-        await _updateFirebaseStatus(ticketId, summary, 2);
-      } else {
-        await _updateFirebaseStatus(ticketId, summary, 1);
-      }
-      // Remove the chat from the provider
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      _chatProvider.removeResolvedChat(ticketId,userProvider.userId);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    await _chatProvider.removeResolvedChat(ticketId, userProvider.userId);
 
-      // Update the UI
+    // Use a callback to update the state after the current build is complete
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {
         if (_chatProvider.conversations.isEmpty) {
-          _chatProvider.conversations.add([
-            {'sender': 'bot', 'text': 'All tasks resolved. Great job!'}
-          ]);
-          selectedConversationIndex = 0;
-        } else if (selectedConversationIndex >=
-            _chatProvider.conversations.length) {
-          selectedConversationIndex = _chatProvider.conversations.length - 1;
+          selectedConversationIndex = -1; // No active conversation
+        } else {
+          selectedConversationIndex = 0; // Select the first available conversation
         }
       });
+    });
 
-      print('Chat resolved and removed for ticket $ticketId');
-    } catch (e) {
-      print('Error resolving chat: $e');
-    }
+    print('Chat resolved and removed for ticket $ticketId');
+
+    // Show a dialog indicating completion
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent dismissing the dialog by tapping outside
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Chat Resolved"),
+          content: Text("This chat has been successfully resolved and the ticket has been updated."),
+          actions: <Widget>[
+            TextButton(
+              child: Text("OK"),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop(); // Return to the previous screen
+              },
+            ),
+          ],
+        );
+      },
+    );
+  } catch (e) {
+    print('Error resolving chat: $e');
   }
+}
 
   Future<void> _updateFirebaseStatus(
       String ticketId, String summary, int user) async {
@@ -201,12 +235,24 @@ Future<void> _initializeUserAndChats(UserProvider userProvider) async {
           if (user == 1) {
           } else if (user == 2) {
             doc.reference.update({'status': 'Resolved'});
-            doc.reference.update({'Maintenance Summary': summary});
-
-
+            doc.reference.update({'summary': summary});
           }
         }
       });
+
+          // Also update the user's chats collection
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userProvider.userId)
+        .collection('chats')
+        .where('ticketId', isEqualTo: ticketId)
+        .get()
+        .then((querySnapshot) {
+      for (var doc in querySnapshot.docs) {
+        doc.reference.update({'status': 'Resolved'});
+      }
+    });
       print('Updated Firebase status for ticket $ticketId');
     } catch (e) {
       print('Error updating Firebase status: $e');
@@ -338,54 +384,56 @@ Future<void> _initializeUserAndChats(UserProvider userProvider) async {
   }
 
   Widget _buildInputArea() {
-  return Container(
-    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    color: Colors.grey[900],
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.end, // Align items to the bottom
-      children: [
-        Expanded(
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: 150, // Set a maximum height for the input area
-            ),
-            child: TextField(
-              controller: _controller,
-              onSubmitted: (text) => _sendMessage(text,
-                  conversationIndex: selectedConversationIndex),
-              style: TextStyle(color: Colors.white),
-              maxLines: null, // Allow multiple lines
-              keyboardType: TextInputType.multiline, // Enable multiline input
-              textInputAction: TextInputAction.newline, // Add new line on enter
-              decoration: InputDecoration(
-                hintText: 'Type your message...',
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      color: Colors.grey[900],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end, // Align items to the bottom
+        children: [
+          Expanded(
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: 150, // Set a maximum height for the input area
+              ),
+              child: TextField(
+                controller: _controller,
+                onSubmitted: (text) => _sendMessage(text,
+                    conversationIndex: selectedConversationIndex),
+                style: TextStyle(color: Colors.white),
+                maxLines: null, // Allow multiple lines
+                keyboardType: TextInputType.multiline, // Enable multiline input
+                textInputAction:
+                    TextInputAction.newline, // Add new line on enter
+                decoration: InputDecoration(
+                  hintText: 'Type your message...',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
             ),
           ),
-        ),
-        SizedBox(width: 8),
-        IconButton(
-          icon: Icon(Icons.mic,
-              color: _isListening ? Colors.red : Colors.white),
-          onPressed: _isListening ? _stopListening : _startListening,
-        ),
-        IconButton(
-          icon: Icon(Icons.send, color: Colors.white),
-          onPressed: () => _sendMessage(_controller.text,
-              conversationIndex: selectedConversationIndex),
-        ),
-      ],
-    ),
-  );
-}
+          SizedBox(width: 8),
+          IconButton(
+            icon: Icon(Icons.mic,
+                color: _isListening ? Colors.red : Colors.white),
+            onPressed: _isListening ? _stopListening : _startListening,
+          ),
+          IconButton(
+            icon: Icon(Icons.send, color: Colors.white),
+            onPressed: () => _sendMessage(_controller.text,
+                conversationIndex: selectedConversationIndex),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildMobileLayout() {
     return Column(
@@ -462,17 +510,17 @@ Future<void> _initializeUserAndChats(UserProvider userProvider) async {
               return isWebPlatform() ? _buildWebLayout() : _buildMobileLayout();
             },
           )
-        : Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 20),
-                Text("Initializing... Please wait."),
-              ],
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 20),
+                  Text("Initializing... Please wait."),
+                ],
+              ),
             ),
-          ),
-    resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: true,
     );
   }
 }

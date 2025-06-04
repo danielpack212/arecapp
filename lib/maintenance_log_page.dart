@@ -9,6 +9,8 @@ import 'notification_service.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_markdown/flutter_markdown.dart';
+
 
 Future<String> generatePlot(String startDate, String endDate, String consumptionType, String taskId) async {
   final serverUrl = 'http://localhost:3000/generate-plot';
@@ -1983,73 +1985,88 @@ Future<void> _sendNotificationToTechnician(String technicianUid, String ticketId
   }
 
   Widget _buildTaskSummaryWidget(String taskId) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _fetchTaskSummary(taskId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red));
-        } else if (!snapshot.hasData) {
-          return Text('No summary available', style: TextStyle(fontStyle: FontStyle.italic));
-        }
+  return FutureBuilder<Map<String, dynamic>>(
+    future: _fetchTaskSummary(taskId),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return Center(child: CircularProgressIndicator());
+      } else if (snapshot.hasError) {
+        return Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red));
+      } else if (!snapshot.hasData) {
+        return Text('No summary available', style: TextStyle(fontStyle: FontStyle.italic));
+      }
 
-        Map<String, dynamic> summary = snapshot.data!;
-        return Container(
-          constraints: BoxConstraints(maxHeight: 200), // Set a maximum height for the summary
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue[50]!, Colors.blue[100]!],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.3),
-                spreadRadius: 2,
-                blurRadius: 5,
-                offset: Offset(0, 3),
-              ),
-            ],
+      Map<String, dynamic> summary = snapshot.data!;
+      return Container(
+        constraints: BoxConstraints(maxHeight: 200), // Set a maximum height for the summary
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue[50]!, Colors.blue[100]!],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.summarize, color: Colors.blue[800]),
-                      SizedBox(width: 8),
-                      Text(
-                        'Task Summary',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[800],
-                        ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 2,
+              blurRadius: 5,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.summarize, color: Colors.blue[800]),
+                    SizedBox(width: 8),
+                    Text(
+                      'Task Summary',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[800],
                       ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    summary['summary'],
-                    style: TextStyle(
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                MarkdownBody(
+                  data: summary['summary'],
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
                       fontSize: 16,
                       color: Colors.black87,
                       height: 1.5,
                     ),
+                    strong: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    em: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Colors.black87,
+                    ),
+                    listBullet: TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
+
 
 
 }
