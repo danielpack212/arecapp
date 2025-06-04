@@ -43,20 +43,22 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    _initializeUserAndChats(userProvider).catchError((error) {
-      print('Error in initState: $error');
-      if (mounted) {
-        setState(() {
-          _isInitialized = true; // Set to true even on error
-        });
-      }
-    });
-  }
+@override
+void initState() {
+  super.initState();
+  _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  _initializeUserAndChats(userProvider).then((_) {
+    _setupFirebaseListener(userProvider.userId);
+  }).catchError((error) {
+    print('Error in initState: $error');
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
+    }
+  });
+}
 
   Future<void> _initializeUserAndChats(UserProvider userProvider) async {
     try {
@@ -97,6 +99,25 @@ class _ChatbotPageState extends State<ChatbotPage> {
       setState(() {});
     }
   }
+
+  void _setupFirebaseListener(String userId) {
+  FirebaseFirestore.instance
+      .collection('tasks')
+      .where('assignedTo', isEqualTo: userId)
+      .snapshots()
+      .listen((snapshot) {
+    for (var change in snapshot.docChanges) {
+      if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
+        String ticketId = change.doc['ticketId'];
+        String symptom = change.doc['symptom'];
+        String status = change.doc['status'];
+        if (status != 'Resolved' && !_chatProvider.chatExists(ticketId)) {
+          _chatProvider.addNewChat(ticketId, userRole, symptom, userId);
+        }
+      }
+    }
+  });
+}
 
   bool isWebPlatform() => kIsWeb;
 
