@@ -11,6 +11,8 @@ import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'user_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
+
 
 const String BASE_URL = 'http://192.168.204.10:5000';
 String userRole = 'm';
@@ -75,8 +77,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
       }
 
       userRole = userProvider.userRole;
-      print('in firebase listener');
-      print(userRole);
     } catch (e) {
       print('Error initializing user and chats: $e');
       // You might want to rethrow the error or handle it in some way
@@ -233,6 +233,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
           .then((querySnapshot) {
         for (var doc in querySnapshot.docs) {
           if (user == 1) {
+            
           } else if (user == 2) {
             doc.reference.update({'status': 'Resolved'});
             doc.reference.update({'summary': summary});
@@ -302,27 +303,40 @@ class _ChatbotPageState extends State<ChatbotPage> {
     setState(() => _isListening = false);
   }
 
-  Widget _buildMessage(Map<String, String> message) {
-    bool isUser = message['sender'] == 'user';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-        decoration: BoxDecoration(
-          color: isUser ? Colors.blue[100] : Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: MarkdownBody(
-          data: message['text'] ?? '',
-          selectable: true,
-          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-            p: TextStyle(fontSize: 16.0),
+Widget _buildMessage(Map<String, String> message) {
+  bool isUser = message['sender'] == 'user';
+  return Align(
+    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+    child: Container(
+      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+      decoration: BoxDecoration(
+        color: isUser ? Colors.blue[100] : Colors.grey[200],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: MarkdownBody(
+        data: message['text'] ?? '',
+        selectable: true,
+        styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+          p: TextStyle(fontSize: 16.0, color: Colors.black),
+          strong: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold, color: Colors.black),
+          em: TextStyle(fontSize: 16.0, fontStyle: FontStyle.italic, color: Colors.black),
+          code: TextStyle(fontSize: 14.0, color: Colors.black, backgroundColor: Colors.grey[300]),
+          codeblockPadding: EdgeInsets.all(8),
+          codeblockDecoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(8),
           ),
+          blockquote: TextStyle(fontSize: 16.0, color: Colors.black87, fontStyle: FontStyle.italic),
+          blockquoteDecoration: BoxDecoration(
+            border: Border(left: BorderSide(color: Colors.grey[600]!, width: 4)),
+          ),
+          listBullet: TextStyle(fontSize: 16.0, color: Colors.black),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildDropdown() {
     if (_chatProvider.chatTitles.isEmpty) return Container();
@@ -386,57 +400,74 @@ class _ChatbotPageState extends State<ChatbotPage> {
     );
   }
 
-  Widget _buildInputArea() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      color: Colors.grey[900],
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end, // Align items to the bottom
-        children: [
-          Expanded(
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: 150, // Set a maximum height for the input area
-              ),
-              child: TextField(
-                controller: _controller,
-                onSubmitted: (text) => _sendMessage(text,
-                    conversationIndex: selectedConversationIndex),
-                style: TextStyle(color: Colors.white),
-                maxLines: null, // Allow multiple lines
-                keyboardType: TextInputType.multiline, // Enable multiline input
-                textInputAction:
-                    TextInputAction.newline, // Add new line on enter
-                decoration: InputDecoration(
-                  hintText: 'Type your message...',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  filled: true,
-                  fillColor: Colors.grey[800],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+
+Widget _buildInputArea() {
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    color: Colors.grey[900],
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: 150,
+            ),
+            child: TextField(
+              controller: _controller,
+              style: TextStyle(color: Colors.white),
+              maxLines: 1, // Set to 1 to prevent multiline input
+              keyboardType: TextInputType.text, // Change to single line text input
+              textInputAction: TextInputAction.send, // Change to send action
+              decoration: InputDecoration(
+                hintText: 'Type your message...',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                filled: true,
+                fillColor: Colors.grey[800],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
+              onSubmitted: (value) {
+                _sendMessage(value, conversationIndex: selectedConversationIndex);
+                _controller.clear();
+              },
             ),
           ),
-          SizedBox(width: 8),
-          IconButton(
-            icon: Icon(Icons.mic,
-                color: _isListening ? Colors.red : Colors.white),
-            onPressed: _isListening ? _stopListening : _startListening,
-          ),
-          IconButton(
-            icon: Icon(Icons.send, color: Colors.white),
-            onPressed: () => _sendMessage(_controller.text,
-                conversationIndex: selectedConversationIndex),
-          ),
-        ],
-      ),
-    );
+        ),
+        SizedBox(width: 8),
+        IconButton(
+          icon: Icon(Icons.mic, color: _isListening ? Colors.red : Colors.white),
+          onPressed: _isListening ? _stopListening : _startListening,
+        ),
+        IconButton(
+          icon: Icon(Icons.send, color: Colors.white),
+          onPressed: () {
+            _sendMessage(_controller.text, conversationIndex: selectedConversationIndex);
+            _controller.clear();
+          },
+        ),
+      ],
+    ),
+  );
+}
+
+void _handleKeyPress(RawKeyEvent event) {
+  if (event is RawKeyDownEvent) {
+    if (event.logicalKey == LogicalKeyboardKey.enter && !event.isShiftPressed) {
+      // Send the message
+      _sendMessage(_controller.text, conversationIndex: selectedConversationIndex);
+      
+      // Clear the text field
+      _controller.clear();
+      
+      // Force a rebuild to update the UI
+      setState(() {});
+    }
   }
+}
 
   Widget _buildMobileLayout() {
     return Column(
@@ -476,7 +507,10 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return RawKeyboardListener(
+    focusNode: FocusNode(),
+    onKey: _handleKeyPress,
+    child: Scaffold(
       appBar: isWebPlatform()
           ? null
           : AppBar(
@@ -520,6 +554,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
         },
       ),
       resizeToAvoidBottomInset: true,
-    );
+    ));
   }
 }
