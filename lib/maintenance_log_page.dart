@@ -189,10 +189,12 @@ void _listenForNewTasks() {
   Query query = FirebaseFirestore.instance.collection('tasks');
 
   if (userRole == 'Maintenance Technician') {
-    query = query.where('assignedTo', isEqualTo: userId);
+    query = query.where('assignedTo', isEqualTo: userId)
+             .where('status', isNotEqualTo: 'Resolved');
+
   } else {
     // For Energy Experts, listen for all new tasks that are not resolved
-    query = query.where('status', isNotEqualTo: 'Resolved');
+    query = query.where('status', isEqualTo: 'Unassigned');
   }
 
   _taskSubscription = query.snapshots().listen((snapshot) {
@@ -201,7 +203,7 @@ void _listenForNewTasks() {
         String ticketId = change.doc['ticketId'];
         String symptom = change.doc['symptom'] ?? 'Unknown issue';
         if (!_chatProvider.chatExists(ticketId)) {
-          _chatProvider.addNewChat(ticketId,userId, symptom, userId);
+          _chatProvider.addNewChat(ticketId,userRole, symptom, userId);
         }
       }
     }
@@ -229,10 +231,11 @@ void _initializeChatsFromFirestore() async {
   Query query = FirebaseFirestore.instance.collection('tasks');
 
   if (userRole == 'Maintenance Technician') {
-    query = query.where('assignedTo', isEqualTo: userId);
+    query = query.where('assignedTo', isEqualTo: userId)
+             .where('status', isNotEqualTo: 'Resolved');
   } else {
     // For Energy Experts, show all tasks that are not resolved
-    query = query.where('status', isNotEqualTo: 'Resolved');
+    query = query.where('status', isEqualTo: 'Unassigned');
   }
 
   QuerySnapshot snapshot = await query.get();
@@ -241,7 +244,7 @@ void _initializeChatsFromFirestore() async {
     String ticketId = doc['ticketId'];
     String symptom = doc['symptom'] ?? 'Unknown issue';
     if (!_chatProvider.chatExists(ticketId)) {
-      await _chatProvider.addNewChat(ticketId, userId, symptom, userId);
+      await _chatProvider.addNewChat(ticketId, userRole, symptom, userId);
     }
   }
 }
@@ -287,10 +290,10 @@ void _initializeChatsFromFirestore() async {
   }
 
 // create new chat
-  void createNewChatTab(String ticketId, String symptom, String userId) {
+  void createNewChatTab(String ticketId, String symptom, String userId, String userRole) {
     // You'll need to implement a way to communicate between pages
     // One way is to use a global state management solution like Provider
-    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,userId, symptom,userId);
+    Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,userRole, symptom,userId);
   }
 
 // close chat
@@ -1272,7 +1275,7 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
 
       // Create a new chat for this task
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,technician,symptom,userProvider.userId);
+      Provider.of<ChatProvider>(context, listen: false).addNewChat(ticketId,userProvider.userRole,symptom,userProvider.userId);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('New task created successfully')),
@@ -1919,7 +1922,7 @@ Future<void> _assignTechnician(Map<String, dynamic> data, String? selectedTechni
       try {
         final chatProvider = Provider.of<ChatProvider>(context, listen: false);
         final userProvider = Provider.of<UserProvider>(context, listen: false);
-        await chatProvider.addNewChat(data['ticketId'], technicianUid, data['symptom'],userProvider.userId);
+        await chatProvider.addNewChat(data['ticketId'], userProvider.userRole, data['symptom'],userProvider.userId);
       } catch (e) {
         print('Error creating chat: $e');
         // Optionally show a warning, but don't treat it as a failure

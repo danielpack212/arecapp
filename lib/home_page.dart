@@ -17,7 +17,7 @@ String userRole = 'm';
 int n = 0;
 
 class ChatbotPage extends StatefulWidget {
-  final String? initialTicketId; // Add this parameter
+  final String? initialTicketId;
   const ChatbotPage({Key? key, this.initialTicketId}) : super(key: key);
 
   @override
@@ -25,38 +25,36 @@ class ChatbotPage extends StatefulWidget {
 }
 
 class _ChatbotPageState extends State<ChatbotPage> {
+  static bool _hasInitialized = false; // Add this line
+
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
   late ChatProvider _chatProvider;
-  bool _isInitialized = false; // Add this line
   int selectedConversationIndex = 0;
   bool _isListening = false;
   String _speechText = '';
   final stt.SpeechToText _speech = stt.SpeechToText();
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
-  }
+  late Future<void> _initializationFuture;
 
   @override
   void initState() {
     super.initState();
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    if (!_hasInitialized) {
+      _initializationFuture = _initializeOnce();
+      _hasInitialized = true;
+    } else {
+      _initializationFuture = Future.value(); // Already initialized
+    }
+  }
+
+  Future<void> _initializeOnce() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    _initializeUserAndChats(userProvider).then((_) {
-      _setupFirebaseListener(userProvider.userId);
-    }).catchError((error) {
-      print('Error in initState: $error');
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-      }
-    });
+    await _initializeUserAndChats(userProvider);
+    _setupFirebaseListener(userProvider.userId);
   }
 
   Future<void> _initializeUserAndChats(UserProvider userProvider) async {
@@ -75,27 +73,13 @@ class _ChatbotPageState extends State<ChatbotPage> {
         await _chatProvider.initializeChatsFromFirestore(
             userProvider.userRole, userProvider.userId);
       }
-      userRole = userProvider.userRole;
 
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-      }
+      userRole = userProvider.userRole;
+      print('in firebase listener');
+      print(userRole);
     } catch (e) {
       print('Error initializing user and chats: $e');
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-      }
-    }
-  }
-
-  Future<void> _initializeChats(String userRole, String userId) async {
-    await _chatProvider.initializeChatsFromFirestore(userRole, userId);
-    if (mounted) {
-      setState(() {});
+      // You might want to rethrow the error or handle it in some way
     }
   }
 
@@ -195,48 +179,49 @@ class _ChatbotPageState extends State<ChatbotPage> {
     setState(() {}); // Trigger a rebuild of the UI
   }
 
- Future<void> _resolveChat(String ticketId, String summary) async {
-  try {
-    if (userRole == 'Maintenance Technician') {
-      await _updateFirebaseStatus(ticketId, summary, 2);
-    } else {
-      await _updateFirebaseStatus(ticketId, summary, 1);
+  Future<void> _resolveChat(String ticketId, String summary) async {
+    try {
+      if (userRole == 'Maintenance Technician') {
+        await _updateFirebaseStatus(ticketId, summary, 2);
+      } else {
+        await _updateFirebaseStatus(ticketId, summary, 1);
+      }
+
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await _chatProvider.removeResolvedChat(ticketId, userProvider.userId);
+
+      // Show a dialog indicating completion
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text("Chat Resolved"),
+            content: Text(
+                "This chat has been successfully resolved and the ticket has been updated."),
+            actions: <Widget>[
+              TextButton(
+                child: Text("OK"),
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close the dialog
+                  setState(() {
+                    // Reset the selected conversation index if needed
+                    if (_chatProvider.conversations.isEmpty) {
+                      selectedConversationIndex = -1;
+                    } else {
+                      selectedConversationIndex = 0;
+                    }
+                  });
+                },
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      print('Error resolving chat: $e');
     }
-
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    await _chatProvider.removeResolvedChat(ticketId, userProvider.userId);
-
-    // Show a dialog indicating completion
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text("Chat Resolved"),
-          content: Text("This chat has been successfully resolved and the ticket has been updated."),
-          actions: <Widget>[
-            TextButton(
-              child: Text("OK"),
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-                setState(() {
-                  // Reset the selected conversation index if needed
-                  if (_chatProvider.conversations.isEmpty) {
-                    selectedConversationIndex = -1;
-                  } else {
-                    selectedConversationIndex = 0;
-                  }
-                });
-              },
-            ),
-          ],
-        );
-      },
-    );
-  } catch (e) {
-    print('Error resolving chat: $e');
   }
-}
 
   Future<void> _updateFirebaseStatus(
       String ticketId, String summary, int user) async {
@@ -384,7 +369,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
           );
         }
         if (selectedConversationIndex >= chatProvider.conversations.length) {
-        selectedConversationIndex = 0;
+          selectedConversationIndex = 0;
         }
 
         List<Map<String, String>> currentConversation =
@@ -453,14 +438,14 @@ class _ChatbotPageState extends State<ChatbotPage> {
     );
   }
 
-Widget _buildMobileLayout() {
-  return Column(
-    children: [
-      Expanded(child: _buildChatList()),
-      _buildInputArea(),
-    ],
-  );
-}
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        Expanded(child: _buildChatList()),
+        _buildInputArea(),
+      ],
+    );
+  }
 
   Widget _buildWebLayout() {
     return Row(
@@ -516,24 +501,24 @@ Widget _buildMobileLayout() {
               ),
               backgroundColor: Colors.grey[900],
             ),
-      body: _isInitialized
-          ? Consumer<ChatProvider>(
+      body: FutureBuilder(
+        future: _initializationFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return Consumer<ChatProvider>(
               builder: (context, chatProvider, child) {
                 return isWebPlatform()
                     ? _buildWebLayout()
                     : _buildMobileLayout();
               },
-            )
-          : Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 20),
-                  Text("Initializing... Please wait."),
-                ],
-              ),
-            ),
+            );
+          } else {
+            return Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+        },
+      ),
       resizeToAvoidBottomInset: true,
     );
   }

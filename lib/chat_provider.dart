@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
+
 const String BASE_URL = 'http://192.168.204.10:5000';
 
 class ChatProvider extends ChangeNotifier {
@@ -63,6 +64,8 @@ class ChatProvider extends ChangeNotifier {
       int n = userRole == 'Energy Expert' ? 1 : 2;
 
       ticketId = ticketId.replaceAll(RegExp(r'[^0-9]'), '');
+      print('Adding new chat for user role: $userId');
+      print('User ID (n): $n');
 
       final response = await http.post(
         Uri.parse('$BASE_URL/initial_chat'),
@@ -128,12 +131,13 @@ class ChatProvider extends ChangeNotifier {
   Future<void> initializeChatsFromFirestore(
       String userRole, String userId) async {
     QuerySnapshot snapshot;
+    print('initial chats from firestore');
+    print(userRole);
 
     if (userRole == 'Energy Expert') {
       snapshot = await FirebaseFirestore.instance
           .collection('tasks')
-          .where('assignedBy', isEqualTo: 'Unassigned')
-          .where('status', isNotEqualTo: 'Resolved')
+          .where('status', isEqualTo: 'Unassigned')
           .get();
     } else if (userRole == 'Maintenance Technician') {
       snapshot = await FirebaseFirestore.instance
@@ -149,6 +153,7 @@ class ChatProvider extends ChangeNotifier {
       String ticketId = doc['ticketId'];
       String symptom = doc['symptom'];
       if (!chatExists(ticketId)) {
+        print(userRole);
         await addNewChat(ticketId, userRole, symptom, userId);
       }
     }
