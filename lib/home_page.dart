@@ -305,34 +305,27 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
 Widget _buildMessage(Map<String, String> message) {
   bool isUser = message['sender'] == 'user';
+
   return Align(
     alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
     child: Container(
-      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
       decoration: BoxDecoration(
-        color: isUser ? Colors.blue[100] : Colors.grey[200],
+        color: Colors.grey[200],
         borderRadius: BorderRadius.circular(12),
       ),
-      child: MarkdownBody(
-        data: message['text'] ?? '',
-        selectable: true,
-        styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-          p: TextStyle(fontSize: 16.0, color: Colors.black),
-          strong: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold, color: Colors.black),
-          em: TextStyle(fontSize: 16.0, fontStyle: FontStyle.italic, color: Colors.black),
-          code: TextStyle(fontSize: 14.0, color: Colors.black, backgroundColor: Colors.grey[300]),
-          codeblockPadding: EdgeInsets.all(8),
-          codeblockDecoration: BoxDecoration(
-            color: Colors.grey[300],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          blockquote: TextStyle(fontSize: 16.0, color: Colors.black87, fontStyle: FontStyle.italic),
-          blockquoteDecoration: BoxDecoration(
-            border: Border(left: BorderSide(color: Colors.grey[600]!, width: 4)),
-          ),
-          listBullet: TextStyle(fontSize: 16.0, color: Colors.black),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
+      child: Text(
+        message['text'] ?? '',
+        style: const TextStyle(
+          fontSize: 16.0,
+          color: Colors.black,
         ),
+        softWrap: true,
+        overflow: TextOverflow.visible,
       ),
     ),
   );
