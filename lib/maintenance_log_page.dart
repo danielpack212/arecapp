@@ -1354,7 +1354,7 @@ Widget _buildCreateNewTaskButton(BuildContext context) {
 void _showDetailPopup(BuildContext context, Map<String, dynamic> data) {
   final userRole = context.read<UserProvider>().userRole;
   
-  DateTime endDate = DateTime.now();
+  DateTime endDate = DateTime.now();//.subtract(Duration(days: 355));
   DateTime startDate = endDate.subtract(Duration(days: 365));
 
   // Ensure startDate is not after endDate
