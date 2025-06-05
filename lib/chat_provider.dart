@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 
-const String BASE_URL = 'http://192.168.204.10:5000';
+const String BASE_URL = 'http://192.168.1.10:5000';
 
 class ChatProvider extends ChangeNotifier {
   List<String> chatTitles = [];
