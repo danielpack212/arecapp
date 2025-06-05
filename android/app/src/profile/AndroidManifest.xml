@@ -3,7 +3,7 @@
 
     <application
         android:label="ARECC1.App"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap-xxhdpi/ic_launcher"
 
         <activity
             android:name=".MainActivity"

@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
-
 const String BASE_URL = 'http://192.168.1.10:5000';
 
 class ChatProvider extends ChangeNotifier {
@@ -137,7 +136,7 @@ class ChatProvider extends ChangeNotifier {
     if (userRole == 'Energy Expert') {
       snapshot = await FirebaseFirestore.instance
           .collection('tasks')
-          .where('assignedBy', isEqualTo: 'Unassigned')
+          .where('assignedBy', isEqualTo: 'Action Required')
           .get();
     } else if (userRole == 'Maintenance Technician') {
       snapshot = await FirebaseFirestore.instance

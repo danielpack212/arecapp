@@ -2,7 +2,7 @@
     package="ARECC1.App">
 
     <application
-        android:label="ARECC1.App"
+        android:label="TuneUp"
         android:icon="@mipmap/ic_launcher">
 
         <activity
