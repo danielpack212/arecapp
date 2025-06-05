@@ -13,7 +13,6 @@ import 'user_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 
-
 const String BASE_URL = 'http://192.168.1.10:5000';
 String userRole = 'm';
 int n = 0;
@@ -63,7 +62,8 @@ class _ChatbotPageState extends State<ChatbotPage> {
     try {
       await userProvider.ensureUserRoleLoaded();
       await userProvider.fetchUserRole();
-
+      print('initializeuserandchats');
+      print(userProvider.userRole);
       if (userProvider.userRole.isEmpty) {
         print('No user role');
         // Handle this case, maybe set a default role or show an error message
@@ -233,7 +233,6 @@ class _ChatbotPageState extends State<ChatbotPage> {
           .then((querySnapshot) {
         for (var doc in querySnapshot.docs) {
           if (user == 1) {
-            
           } else if (user == 2) {
             doc.reference.update({'status': 'Resolved'});
             doc.reference.update({'summary': summary});
@@ -303,33 +302,33 @@ class _ChatbotPageState extends State<ChatbotPage> {
     setState(() => _isListening = false);
   }
 
-Widget _buildMessage(Map<String, String> message) {
-  bool isUser = message['sender'] == 'user';
+  Widget _buildMessage(Map<String, String> message) {
+    bool isUser = message['sender'] == 'user';
 
-  return Align(
-    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
-      ),
-      child: Text(
-        message['text'] ?? '',
-        style: const TextStyle(
-          fontSize: 16.0,
-          color: Colors.black,
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(12),
         ),
-        softWrap: true,
-        overflow: TextOverflow.visible,
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        child: Text(
+          message['text'] ?? '',
+          style: const TextStyle(
+            fontSize: 16.0,
+            color: Colors.black,
+          ),
+          softWrap: true,
+          overflow: TextOverflow.visible,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildDropdown() {
     if (_chatProvider.chatTitles.isEmpty) return Container();
@@ -393,74 +392,80 @@ Widget _buildMessage(Map<String, String> message) {
     );
   }
 
-
-Widget _buildInputArea() {
-  return Container(
-    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    color: Colors.grey[900],
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: 150,
-            ),
-            child: TextField(
-              controller: _controller,
-              style: TextStyle(color: Colors.white),
-              maxLines: 1, // Set to 1 to prevent multiline input
-              keyboardType: TextInputType.text, // Change to single line text input
-              textInputAction: TextInputAction.send, // Change to send action
-              decoration: InputDecoration(
-                hintText: 'Type your message...',
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  Widget _buildInputArea() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      color: Colors.grey[900],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: 150,
               ),
-              onSubmitted: (value) {
-                _sendMessage(value, conversationIndex: selectedConversationIndex);
-                _controller.clear();
-              },
+              child: TextField(
+                controller: _controller,
+                style: TextStyle(color: Colors.white),
+                maxLines: 1, // Set to 1 to prevent multiline input
+                keyboardType:
+                    TextInputType.text, // Change to single line text input
+                textInputAction: TextInputAction.send, // Change to send action
+                decoration: InputDecoration(
+                  hintText: 'Type your message...',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                onSubmitted: (value) {
+                  _sendMessage(value,
+                      conversationIndex: selectedConversationIndex);
+                  _controller.clear();
+                },
+              ),
             ),
           ),
-        ),
-        SizedBox(width: 8),
-        IconButton(
-          icon: Icon(Icons.mic, color: _isListening ? Colors.red : Colors.white),
-          onPressed: _isListening ? _stopListening : _startListening,
-        ),
-        IconButton(
-          icon: Icon(Icons.send, color: Colors.white),
-          onPressed: () {
-            _sendMessage(_controller.text, conversationIndex: selectedConversationIndex);
-            _controller.clear();
-          },
-        ),
-      ],
-    ),
-  );
-}
+          SizedBox(width: 8),
+          IconButton(
+            icon: Icon(Icons.mic,
+                color: _isListening ? Colors.red : Colors.white),
+            onPressed: _isListening ? _stopListening : _startListening,
+          ),
+          IconButton(
+            icon: Icon(Icons.send, color: Colors.white),
+            onPressed: () {
+              _sendMessage(_controller.text,
+                  conversationIndex: selectedConversationIndex);
+              _controller.clear();
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
-void _handleKeyPress(RawKeyEvent event) {
-  if (event is RawKeyDownEvent) {
-    if (event.logicalKey == LogicalKeyboardKey.enter && !event.isShiftPressed) {
-      // Send the message
-      _sendMessage(_controller.text, conversationIndex: selectedConversationIndex);
-      
-      // Clear the text field
-      _controller.clear();
-      
-      // Force a rebuild to update the UI
-      setState(() {});
+  void _handleKeyPress(RawKeyEvent event) {
+    if (event is RawKeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.enter &&
+          !event.isShiftPressed) {
+        // Send the message
+        _sendMessage(_controller.text,
+            conversationIndex: selectedConversationIndex);
+
+        // Clear the text field
+        _controller.clear();
+
+        // Force a rebuild to update the UI
+        setState(() {});
+      }
     }
   }
-}
 
   Widget _buildMobileLayout() {
     return Column(
@@ -501,52 +506,54 @@ void _handleKeyPress(RawKeyEvent event) {
   @override
   Widget build(BuildContext context) {
     return RawKeyboardListener(
-    focusNode: FocusNode(),
-    onKey: _handleKeyPress,
-    child: Scaffold(
-      appBar: isWebPlatform()
-          ? null
-          : AppBar(
-              toolbarHeight: 100, // Increase the height of the AppBar
-              flexibleSpace: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // TuneUp logo and text
-                  Row(
+        focusNode: FocusNode(),
+        onKey: _handleKeyPress,
+        child: Scaffold(
+          appBar: isWebPlatform()
+              ? null
+              : AppBar(
+                  toolbarHeight: 100, // Increase the height of the AppBar
+                  flexibleSpace: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('TuneUp',
-                          style: TextStyle(color: Colors.white, fontSize: 20)),
-                      SizedBox(width: 8),
-                      Image.asset('assets/logo.png', height: 30),
+                      // TuneUp logo and text
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('TuneUp',
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 20)),
+                          SizedBox(width: 8),
+                          Image.asset('assets/logo.png', height: 30),
+                        ],
+                      ),
+                      SizedBox(height: 10), // Space between logo and dropdown
+                      // Dropdown
+                      if (_chatProvider.conversations.isNotEmpty)
+                        _buildDropdown(),
                     ],
                   ),
-                  SizedBox(height: 10), // Space between logo and dropdown
-                  // Dropdown
-                  if (_chatProvider.conversations.isNotEmpty) _buildDropdown(),
-                ],
-              ),
-              backgroundColor: Colors.grey[900],
-            ),
-      body: FutureBuilder(
-        future: _initializationFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return Consumer<ChatProvider>(
-              builder: (context, chatProvider, child) {
-                return isWebPlatform()
-                    ? _buildWebLayout()
-                    : _buildMobileLayout();
-              },
-            );
-          } else {
-            return Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-        },
-      ),
-      resizeToAvoidBottomInset: true,
-    ));
+                  backgroundColor: Colors.grey[900],
+                ),
+          body: FutureBuilder(
+            future: _initializationFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                return Consumer<ChatProvider>(
+                  builder: (context, chatProvider, child) {
+                    return isWebPlatform()
+                        ? _buildWebLayout()
+                        : _buildMobileLayout();
+                  },
+                );
+              } else {
+                return Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+            },
+          ),
+          resizeToAvoidBottomInset: true,
+        ));
   }
 }

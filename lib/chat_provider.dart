@@ -64,7 +64,7 @@ class ChatProvider extends ChangeNotifier {
       int n = userRole == 'Energy Expert' ? 1 : 2;
 
       ticketId = ticketId.replaceAll(RegExp(r'[^0-9]'), '');
-      print('Adding new chat for user role: $userId');
+      print('Adding new chat for user role: $userRole');
       print('User ID (n): $n');
 
       final response = await http.post(

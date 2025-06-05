@@ -9,50 +9,52 @@ class UserProvider extends ChangeNotifier {
 
   String get userRole => _userRole;
   String get userId => _userId;
+  bool get isLoaded => _isLoaded;
 
   Future<void> ensureUserRoleLoaded() async {
     if (!_isLoaded) {
       await fetchUserRole();
-      _isLoaded = true;
     }
   }
 
   Future<void> fetchUserRole() async {
     User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _userId = user.uid;
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (userDoc.exists) {
-        _userRole = userDoc['role'] ?? '';
-      } else {
-        _userRole = ''; // Ensure role is empty if document doesn't exist
-      }
-    } else {
-      _userId = '';
-      _userRole = '';
+    if (user == null) {
+      throw Exception('No authenticated user found');
     }
+    
+    _userId = user.uid;
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_userId)
+        .get();
+
+    if (userDoc.exists) {
+      _userRole = userDoc['role'] ?? '';
+    } else {
+      _userRole = ''; // Ensure role is empty if document doesn't exist
+    }
+    
     _isLoaded = true;
     notifyListeners();
+    print('User role fetched: $_userRole'); // Add this log
   }
 
-  // You can add this method if you want to set the role programmatically
   void setUserRole(String role) {
     _userRole = role;
     notifyListeners();
+    print('User role set: $_userRole'); // Add this log
   }
 
-  // You can add this method if you want to set the user ID programmatically
   void setUserId(String id) {
     _userId = id;
     notifyListeners();
   }
 
-  // Add this method to reset the loaded state if needed
   void resetLoadedState() {
     _isLoaded = false;
+    _userRole = '';
+    _userId = '';
+    notifyListeners();
   }
 }
